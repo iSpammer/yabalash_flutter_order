@@ -1,0 +1,53 @@
+{
+  "id": 129,
+  "title": "Fried Meat Meal",
+  "media": [
+    {
+      "id": 203,
+      "product_id": 129,
+      "media_id": 214,
+      "is_default": 1,
+      "image": {
+        "id": 214,
+        "media_type": 1,
+        "path": {
+          "proxy_url": "https://images.yabalash.com/insecure/fill/",
+          "image_path": "/ce/0/plain/https://yabalash-assets.s3.me-central-1.amazonaws.com/2b5f69/prods/kyvIvup3rmahpH3POqdCBcmA6Eng6GMq7xhGbYRf.jpg@webp",
+          "image_fit": "https://images.yabalash.com/insecure/fit/",
+          "original_image": "https://yabalash-assets.s3.me-central-1.amazonaws.com/2b5f69/prods/kyvIvup3rmahpH3POqdCBcmA6Eng6GMq7xhGbYRf.jpg"
+        }
+      }
+    }
+  ],
+  "vendor": {
+    "id": 34,
+    "slug": "el-prince-restaurant",
+    "name": "El Prince Restaurant", 
+    "desc": "Egyptian restaurant",
+    "logo": {
+      "proxy_url": "https://images.yabalash.com/insecure/fill/",
+      "image_path": "/ce/0/plain/https://yabalash-assets.s3.me-central-1.amazonaws.com/vendor/XSXCCB8FwYnfs8Ohcel9eSMwvnp7jf71SqgfiitL.jpg@webp",
+      "image_fit": "https://images.yabalash.com/insecure/fit/",
+      "image_s3_url": "https://yabalash-assets.s3.me-central-1.amazonaws.com/vendor/XSXCCB8FwYnfs8Ohcel9eSMwvnp7jf71SqgfiitL.jpg"
+    }
+  },
+  "translation": [
+    {
+      "id": 289,
+      "title": "Fried Meat Meal",
+      "body_html": "<p>Beef, Rice, Vegetables and Bread </p>",
+      "product_id": 129,
+      "language_id": 1
+    }
+  ],
+  "variant": [
+    {
+      "id": 133,
+      "price": "31.50",
+      "compare_at_price": "45.00",
+      "quantity": 100,
+      "actual_price": 31.5,
+      "new_price": "31.50"
+    }
+  ]
+}

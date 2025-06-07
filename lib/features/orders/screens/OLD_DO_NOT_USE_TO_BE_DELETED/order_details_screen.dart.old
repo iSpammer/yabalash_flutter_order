@@ -1,0 +1,1215 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
+import 'package:webview_flutter/webview_flutter.dart';
+import 'dart:async';
+import 'dart:math' as math;
+import 'package:lottie/lottie.dart';
+import 'package:intl/intl.dart';
+
+import '../models/order_model.dart';
+import '../services/order_service.dart';
+import '../widgets/order_tracking_indicator.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_utils.dart';
+import '../../../core/widgets/user_detail_widget.dart';
+import '../../../core/widgets/left_right_text.dart';
+import '../../../core/widgets/horizontal_line.dart';
+import '../../auth/providers/auth_provider.dart';
+
+// Exact match of React Native OrderDetail.js
+class OrderDetailsScreen extends StatefulWidget {
+  final String orderId;
+  final int? vendorId;
+  final Map<String, dynamic>? orderDetail;
+  final bool fromActive;
+
+  const OrderDetailsScreen({
+    super.key,
+    required this.orderId,
+    this.vendorId,
+    this.orderDetail,
+    this.fromActive = false,
+  });
+
+  @override
+  State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
+}
+
+class _OrderDetailsScreenState extends State<OrderDetailsScreen>
+    with TickerProviderStateMixin {
+  // State matching React Native exactly
+  bool isLoading = true;
+  bool orderDetailLoader = true;
+  bool isRefreshing = false;
+  bool showTaxFeeArea = false;
+  bool arrowUp = false;
+  
+  // Order data
+  OrderModel? cartData;
+  List<OrderVendorDetailModel> cartItems = [];
+  OrderVendorDetailModel? dispatcherStatus;
+  Map<String, dynamic>? driverStatus;
+  
+  // Tracking
+  String? lalaMoveUrl;
+  String? trackingUrl;
+  String? newDispatchTrakingUrl;
+  Timer? _timer;
+  int? currentPosition;
+  Map<String, dynamic>? orderStatus;
+  
+  // Labels for step indicator
+  List<String> labels = [
+    'Accepted',
+    'Processing', 
+    'Out For Delivery',
+    'Delivered'
+  ];
+  
+  // Google Maps
+  gmaps.GoogleMapController? _mapController;
+  final Map<gmaps.MarkerId, gmaps.Marker> _markers = {};
+  final Set<gmaps.Polyline> _polylines = {};
+  gmaps.LatLng? driverLocation;
+  double? headingAngle;
+  
+  // Animation for driver marker
+  late AnimationController _animationController;
+  Animation<double>? _animation;
+  gmaps.LatLng? _previousDriverLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    _animationController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    );
+    
+    // Initial load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _getOrderDetailScreen();
+    });
+    
+    // Set up 5 second interval matching React Native useInterval
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (mounted && widget.fromActive) {
+        getOrders();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _animationController.dispose();
+    _mapController?.dispose();
+    super.dispose();
+  }
+
+  void getOrders() {
+    final authProvider = context.read<AuthProvider>();
+    if (authProvider.isAuthenticated) {
+      _getOrderDetailScreen();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unauthorized')),
+      );
+    }
+  }
+
+  // Exact match of React Native _getOrderDetailScreen
+  Future<void> _getOrderDetailScreen() async {
+    // Prepare data object
+    Map<String, dynamic> data = {
+      'order_id': widget.orderId,
+    };
+    
+    if (widget.vendorId != null) {
+      data['vendor_id'] = widget.vendorId;
+    }
+    
+    // If we have tracking URL, convert it for driver tracking
+    if (trackingUrl != null && trackingUrl!.isNotEmpty) {
+      newDispatchTrakingUrl = trackingUrl!.replaceAll('/order/', '/order-details/');
+      data['new_dispatch_traking_url'] = newDispatchTrakingUrl;
+    }
+    
+    debugPrint("Sending API data: $data");
+    
+    try {
+      final orderService = OrderService();
+      final response = await orderService.getOrderDetailRaw(data);
+      
+      if (!mounted) return;
+      
+      setState(() {
+        orderDetailLoader = false;
+      });
+      
+      debugPrint("Order detail response: ${response.data}");
+      
+      if (response.data != null) {
+        final responseData = response.data!;
+        
+        // Check for LaLaMove tracking URL
+        if (responseData['vendors'] != null && 
+            responseData['vendors'].isNotEmpty &&
+            responseData['vendors'][0]['lalamove_tracking_url'] != null &&
+            responseData['vendors'][0]['shipping_delivery_type'] == 'L') {
+          setState(() {
+            lalaMoveUrl = responseData['vendors'][0]['lalamove_tracking_url'];
+          });
+        }
+        
+        // Update state
+        setState(() {
+          isLoading = false;
+        });
+        
+        // Update labels for non-delivery orders
+        if (responseData['luxury_option_name'] != 'Delivery') {
+          setState(() {
+            labels = ['Accepted', 'Processing', 'Order Prepared', 'Delivered'];
+          });
+        }
+        
+        // Check driver location and animate
+        Map<String, dynamic>? checkDriver = responseData['order_data'];
+        if (checkDriver != null && 
+            checkDriver['agent_location'] != null &&
+            checkDriver['agent_location']['lat'] != null) {
+          double lat = double.tryParse(checkDriver['agent_location']['lat'].toString()) ?? 0;
+          double lng = double.tryParse(
+            checkDriver['agent_location']['long']?.toString() ?? 
+            checkDriver['agent_location']['lng']?.toString() ?? '0'
+          ) ?? 0;
+          
+          if (lat != 0 && lng != 0) {
+            animate(lat, lng);
+          }
+        }
+        
+        // Update tracking URL if not set
+        if (trackingUrl == null && responseData['vendors'] != null && responseData['vendors'].isNotEmpty) {
+          setState(() {
+            trackingUrl = responseData['vendors'][0]['dispatch_traking_url'];
+          });
+        }
+        
+        // Parse and set all data
+        setState(() {
+          if (responseData['vendors'] != null && responseData['vendors'].isNotEmpty) {
+            dispatcherStatus = OrderVendorDetailModel.fromJson(responseData['vendors'][0]);
+          }
+          cartItems = responseData['vendors'] != null
+              ? (responseData['vendors'] as List)
+                  .map((v) => OrderVendorDetailModel.fromJson(v))
+                  .toList()
+              : [];
+          cartData = OrderModel.fromJson(responseData);
+          isLoading = false;
+          driverStatus = checkDriver;
+          
+          // Set current position for step indicator
+          if (dispatcherStatus?.orderStatus != null) {
+            final status = dispatcherStatus!.orderStatus!;
+            String? currentStatus = status.currentStatus?.title;
+            
+            if (responseData['luxury_option_name'] != 'Delivery') {
+              currentPosition = currentStatus == 'Out For Delivery' 
+                  ? 2 
+                  : labels.indexWhere((label) => 
+                      label.toLowerCase() == currentStatus?.toLowerCase());
+            } else {
+              currentPosition = labels.indexWhere((label) => 
+                  label.toLowerCase() == currentStatus?.toLowerCase());
+            }
+          }
+          
+          orderStatus = dispatcherStatus?.orderStatus?.toJson();
+        });
+      }
+      
+      setState(() {
+        isRefreshing = false;
+      });
+      
+    } catch (error) {
+      debugPrint("Error in _getOrderDetailScreen: $error");
+      setState(() {
+        isLoading = false;
+        orderDetailLoader = false;
+        isRefreshing = false;
+      });
+    }
+  }
+
+  // Animate driver marker
+  void animate(double latitude, double longitude) {
+    if (_mapController != null) {
+      final newLocation = gmaps.LatLng(latitude, longitude);
+      
+      if (_previousDriverLocation != null) {
+        // Animate marker movement
+        _animation = Tween<double>(
+          begin: 0,
+          end: 1,
+        ).animate(CurvedAnimation(
+          parent: _animationController,
+          curve: Curves.easeInOut,
+        ));
+        
+        _animationController.forward(from: 0).then((_) {
+          setState(() {
+            _previousDriverLocation = newLocation;
+            driverLocation = newLocation;
+          });
+        });
+      } else {
+        setState(() {
+          _previousDriverLocation = newLocation;
+          driverLocation = newLocation;
+        });
+      }
+      
+      // Update marker
+      _updateDriverMarker();
+    }
+  }
+
+  void _updateDriverMarker() {
+    if (driverLocation == null) return;
+    
+    final driverMarkerId = const gmaps.MarkerId('driver');
+    
+    setState(() {
+      _markers[driverMarkerId] = gmaps.Marker(
+        markerId: driverMarkerId,
+        position: driverLocation!,
+        icon: gmaps.BitmapDescriptor.defaultMarkerWithHue(
+          gmaps.BitmapDescriptor.hueBlue,
+        ),
+        rotation: (driverStatus?['agent_location']?['heading_angle'] ?? 0) + 180,
+        anchor: const Offset(0.5, 0.5),
+      );
+    });
+  }
+
+  void _fitMapToMarkers() {
+    if (_mapController == null || driverStatus == null) return;
+    
+    final bounds = gmaps.LatLngBounds(
+      southwest: gmaps.LatLng(
+        math.min(
+          double.tryParse(driverStatus!['tasks'][0]['latitude'].toString()) ?? 0,
+          double.tryParse(driverStatus!['tasks'][1]['latitude'].toString()) ?? 0,
+        ),
+        math.min(
+          double.tryParse(driverStatus!['tasks'][0]['longitude'].toString()) ?? 0,
+          double.tryParse(driverStatus!['tasks'][1]['longitude'].toString()) ?? 0,
+        ),
+      ),
+      northeast: gmaps.LatLng(
+        math.max(
+          double.tryParse(driverStatus!['tasks'][0]['latitude'].toString()) ?? 0,
+          double.tryParse(driverStatus!['tasks'][1]['latitude'].toString()) ?? 0,
+        ),
+        math.max(
+          double.tryParse(driverStatus!['tasks'][0]['longitude'].toString()) ?? 0,
+          double.tryParse(driverStatus!['tasks'][1]['longitude'].toString()) ?? 0,
+        ),
+      ),
+    );
+    
+    _mapController!.animateCamera(
+      gmaps.CameraUpdate.newLatLngBounds(bounds, 100),
+    );
+  }
+
+  bool _shouldShowMap() {
+    // Show map when driver is assigned and location is available
+    return driverStatus != null && 
+           driverStatus!['order'] != null &&
+           driverStatus!['agent_location'] != null &&
+           driverStatus!['agent_location']['lat'] != null &&
+           orderStatus?['current_status']?['title'] != 'Delivered' &&
+           lalaMoveUrl == null;
+  }
+
+  bool _showMapDriver() {
+    if (driverStatus == null || driverStatus!['tasks'] == null) return false;
+    
+    final tasks = driverStatus!['tasks'];
+    if (tasks.length == 2) return true;
+    if (tasks.length > 2 && tasks[tasks.length - 3]['task_status'] == '4') return true;
+    
+    return false;
+  }
+
+  String _orderStatusTitle(Map<String, dynamic> val) {
+    if (val['task_type_id'] == 1 && val['task_status'] == '1') {
+      return 'ASSIGNED';
+    }
+    if (val['task_type_id'] == 2 && val['task_status'] == '1') {
+      return 'PENDING';
+    }
+    if (val['task_status'] == '2') {
+      return 'ON THE WAY';
+    }
+    if (val['task_type_id'] == 1 && val['task_status'] == '3') {
+      return 'READY FOR PICKUP';
+    }
+    if (val['task_type_id'] == 2 && val['task_status'] == '3') {
+      return 'READY FOR DEPARTURE';
+    }
+    if (val['task_status'] == '4') {
+      return 'DELIVERED';
+    }
+    return '';
+  }
+
+  void _handleRefresh() {
+    setState(() {
+      isRefreshing = true;
+    });
+    _getOrderDetailScreen();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            'Order #${cartData?.orderNumber ?? 'Loading...'}',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 18.sp,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        body: Center(
+          child: Lottie.asset(
+            'assets/animations/loader.json',
+            width: 100.w,
+            height: 100.w,
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: widget.fromActive 
+              ? () => Navigator.of(context).popUntil((route) => route.isFirst)
+              : () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Order #${cartData?.orderNumber ?? ''}',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 18.sp,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async => _handleRefresh(),
+        color: AppColors.primaryColor,
+        child: ListView(
+          children: [
+            // Header section with driver info and map
+            _buildHeaderSection(),
+            
+            // Main content in bordered container
+            Container(
+              margin: EdgeInsets.all(8.w),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(
+                  color: AppColors.primaryColor,
+                  width: 2,
+                ),
+              ),
+              child: Column(
+                children: [
+                  // Order items
+                  ...cartItems.map((item) => _buildOrderSection(item)),
+                  
+                  // Order info footer
+                  _buildOrderInfoFooter(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderSection() {
+    final showMapDriver = _showMapDriver();
+    
+    return Column(
+      children: [
+        // Driver info if available
+        if (driverStatus != null && 
+            driverStatus!['order'] != null && 
+            driverStatus!['agent_location'] != null &&
+            driverStatus!['agent_location']['lat'] != null &&
+            showMapDriver)
+          UserDetailWidget(
+            data: driverStatus!,
+            type: 'Driver',
+            containerStyle: BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.grey[200]!,
+                  width: 1,
+                ),
+              ),
+            ),
+          ),
+        
+        // Large map view for driver tracking
+        if (_shouldShowMap() && showMapDriver)
+          SizedBox(
+            height: MediaQuery.of(context).size.height / 2.2,
+            child: gmaps.GoogleMap(
+              onMapCreated: (controller) {
+                _mapController = controller;
+                _fitMapToMarkers();
+              },
+              initialCameraPosition: gmaps.CameraPosition(
+                target: gmaps.LatLng(
+                  double.tryParse(driverStatus!['tasks'][driverStatus!['tasks'].length - 2]['latitude'].toString()) ?? 0,
+                  double.tryParse(driverStatus!['tasks'][driverStatus!['tasks'].length - 2]['longitude'].toString()) ?? 0,
+                ),
+                zoom: 14,
+              ),
+              markers: _markers.values.toSet(),
+              polylines: _polylines,
+              myLocationEnabled: false,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: true,
+              mapToolbarEnabled: false,
+            ),
+          ),
+        
+        // LaLaMove WebView if available
+        if (lalaMoveUrl != null && lalaMoveUrl!.isNotEmpty)
+          Container(
+            height: MediaQuery.of(context).size.height / 1.8,
+            color: Colors.white,
+            child: WebViewWidget(
+              controller: WebViewController()
+                ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                ..loadRequest(Uri.parse(lalaMoveUrl!)),
+            ),
+          ),
+        
+        // Order status section
+        if (orderStatus != null && 
+            orderStatus!['current_status']?['title'] == 'Placed')
+          _buildWaitingToAcceptSection(),
+        
+        // Dispatcher status and timeline
+        if (orderStatus != null &&
+            orderStatus!['current_status']?['title'] != 'Rejected' &&
+            orderStatus!['current_status']?['title'] != 'Placed' &&
+            dispatcherStatus?.dispatchTrakingUrl != null)
+          _buildDispatcherStatusSection(showMapDriver),
+      ],
+    );
+  }
+
+  Widget _buildWaitingToAcceptSection() {
+    return Container(
+      color: Colors.white,
+      padding: EdgeInsets.symmetric(vertical: 20.h),
+      child: Column(
+        children: [
+          Lottie.asset(
+            'assets/animations/loader.json',
+            width: 100.w,
+            height: 100.w,
+          ),
+          Text(
+            'Waiting for vendor to accept',
+            style: TextStyle(
+              fontSize: 16.sp,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDispatcherStatusSection(bool showMapDriver) {
+    return Container(
+      color: Colors.white,
+      padding: EdgeInsets.all(16.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Step indicators
+          if (dispatcherStatus != null && showMapDriver)
+            OrderTrackingIndicator(
+              currentStep: currentPosition ?? 0,
+              totalSteps: labels.length,
+              stepTitles: labels,
+              stepDescriptions: labels,
+            ),
+          
+          // Current status text
+          if (dispatcherStatus != null && 
+              dispatcherStatus!.vendorDispatcherStatus?.isNotEmpty == true &&
+              showMapDriver)
+            Padding(
+              padding: EdgeInsets.only(top: 16.h),
+              child: Text(
+                dispatcherStatus!.vendorDispatcherStatus!.last.statusData?.driverStatus ?? '',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: AppColors.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          
+          // ETA
+          if (dispatcherStatus?.orderStatus?.currentStatus?.title != 'Delivered' &&
+              dispatcherStatus?.orderStatus?.currentStatus?.title != 'Rejected' &&
+              (cartData?.scheduledDateTime != null || cartItems.isNotEmpty && cartItems[0].eta != null) &&
+              showMapDriver)
+            Container(
+              margin: EdgeInsets.only(top: 16.h),
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Text(
+                'Your order will arrive by ${cartData?.scheduledDateTime ?? cartItems[0].eta}',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+          
+          // Order status expandable section
+          InkWell(
+            onTap: () {
+              setState(() {
+                arrowUp = !arrowUp;
+              });
+            },
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: 16.h),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Order Status',
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  Icon(
+                    arrowUp ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    color: Colors.grey[600],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Expanded order status timeline
+          if (arrowUp && driverStatus != null && driverStatus!['tasks'] != null)
+            Column(
+              children: (driverStatus!['tasks'] as List).asMap().entries.map((entry) {
+                final index = entry.key;
+                final task = entry.value;
+                final isLast = index == driverStatus!['tasks'].length - 1;
+                
+                return Column(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Status icon
+                        Container(
+                          width: 20.w,
+                          height: 20.w,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: task['task_status'] == '4' 
+                                ? AppColors.primaryColor 
+                                : Colors.grey[300],
+                          ),
+                          child: task['task_status'] == '4'
+                              ? Icon(
+                                  Icons.check,
+                                  size: 12.sp,
+                                  color: Colors.white,
+                                )
+                              : null,
+                        ),
+                        SizedBox(width: 12.w),
+                        
+                        // Task details
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                task['address'] ?? '',
+                                style: TextStyle(
+                                  fontSize: 12.sp,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              if (_orderStatusTitle(task).isNotEmpty)
+                                Text(
+                                  _orderStatusTitle(task),
+                                  style: TextStyle(
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        
+                        // Time
+                        if ((task['task_status'] != '0' && 
+                            task['task_type_id'] == 1 && 
+                            task['task_status'] == '1') || 
+                            task['task_status'] == '4')
+                          Text(
+                            DateFormat.jm().format(
+                              DateTime.parse(task['updated_at'] ?? DateTime.now().toIso8601String()),
+                            ),
+                            style: TextStyle(
+                              fontSize: 12.sp,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                      ],
+                    ),
+                    
+                    // Connector line
+                    if (!isLast)
+                      Container(
+                        margin: EdgeInsets.only(left: 10.w),
+                        height: 20.h,
+                        width: 2,
+                        color: task['task_status'] == '4' 
+                            ? AppColors.primaryColor 
+                            : Colors.grey[300],
+                      ),
+                  ],
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderSection(OrderVendorDetailModel vendor) {
+    return Column(
+      children: [
+        // Vendor info
+        Container(
+          padding: EdgeInsets.all(16.w),
+          child: Row(
+            children: [
+              ClipOval(
+                child: CachedNetworkImage(
+                  imageUrl: ImageUtils.buildImageUrl(vendor.vendor?.logo) ?? '',
+                  width: 50.w,
+                  height: 50.w,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[200],
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    color: Colors.grey[200],
+                    child: Icon(
+                      Icons.store,
+                      color: Colors.grey[400],
+                      size: 24.sp,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      vendor.vendor?.name ?? 'Unknown Vendor',
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    if (vendor.vendor?.address != null)
+                      Text(
+                        vendor.vendor!.address!,
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: Colors.grey[600],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        const HorizontalLine(),
+        
+        // Order items
+        if (vendor.products != null)
+          ...vendor.products!.map((product) => _buildOrderItem(product)),
+        
+        // Price summary
+        _buildVendorPriceSummary(vendor),
+      ],
+    );
+  }
+
+  Widget _buildOrderItem(OrderProductModel product) {
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Product image
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8.r),
+            child: CachedNetworkImage(
+              imageUrl: ImageUtils.buildImageUrl(product.productImage) ?? '',
+              width: 60.w,
+              height: 60.w,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => Container(
+                color: Colors.grey[200],
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: Colors.grey[200],
+                child: Icon(
+                  Icons.image,
+                  color: Colors.grey[400],
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: 12.w),
+          
+          // Product details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.productName ?? 'Unknown Item',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 4.h),
+                Row(
+                  children: [
+                    Text(
+                      'Qty: ${product.quantity}',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    Text(
+                      ' x ',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    Text(
+                      'AED ${product.price.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    Text(
+                      ' = ',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    Text(
+                      'AED ${(product.price * product.quantity).toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                // Product addons if any
+                if (product.productAddons != null && product.productAddons!.isNotEmpty) ...[
+                  SizedBox(height: 8.h),
+                  Text(
+                    'EXTRA',
+                    style: TextStyle(
+                      fontSize: 10.sp,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  ...product.productAddons!.map((addon) => Padding(
+                    padding: EdgeInsets.only(top: 4.h),
+                    child: Row(
+                      children: [
+                        Text(
+                          '${addon.addonTitle}: ',
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          '(${addon.optionTitle})',
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          ' AED ${addon.price.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVendorPriceSummary(OrderVendorDetailModel vendor) {
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        border: Border(
+          top: BorderSide(
+            color: Colors.grey[200]!,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Discount if any
+          if ((vendor.discountAmount ?? 0) > 0)
+            _buildPriceRow('Discount', -(vendor.discountAmount ?? 0)),
+          
+          // Delivery fee
+          if ((vendor.deliveryFee ?? 0) > 0)
+            _buildPriceRow('Delivery Charges', vendor.deliveryFee ?? 0),
+          
+          // Amount
+          _buildPriceRow(
+            'Amount', 
+            vendor.payableAmount ?? 0,
+            isBold: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceRow(String label, double amount, {bool isBold = false}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 4.h),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: isBold ? FontWeight.w600 : FontWeight.normal,
+              color: Colors.black87,
+            ),
+          ),
+          Text(
+            'AED ${amount.abs().toStringAsFixed(2)}${amount < 0 ? '-' : ''}',
+            style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: isBold ? FontWeight.w600 : FontWeight.normal,
+              color: amount < 0 ? Colors.green : Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderInfoFooter() {
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(10.r),
+          bottomRight: Radius.circular(10.r),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Delivery address
+          if (cartData?.addressId != null) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Small map
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10.r),
+                  child: SizedBox(
+                    width: 60.w,
+                    height: 60.w,
+                    child: gmaps.GoogleMap(
+                      onMapCreated: (controller) {},
+                      initialCameraPosition: gmaps.CameraPosition(
+                        target: gmaps.LatLng(
+                          cartData?.address?.latitude ?? 0.0,
+                          cartData?.address?.longitude ?? 0.0,
+                        ),
+                        zoom: 15,
+                      ),
+                      markers: {
+                        gmaps.Marker(
+                          markerId: const gmaps.MarkerId('delivery'),
+                          position: gmaps.LatLng(
+                            cartData?.address?.latitude ?? 0.0,
+                            cartData?.address?.longitude ?? 0.0,
+                          ),
+                        ),
+                      },
+                      zoomControlsEnabled: false,
+                      scrollGesturesEnabled: false,
+                      myLocationButtonEnabled: false,
+                      mapToolbarEnabled: false,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                
+                // Address text
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Delivery Address',
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        '${cartData?.address?.houseNumber ?? ''} ${cartData?.address?.address ?? ''} ${cartData?.address?.pincode ?? ''}',
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16.h),
+          ],
+          
+          // Order details
+          LeftRightText(
+            leftText: 'Order Number',
+            rightText: '#${cartData?.orderNumber ?? ''}',
+          ),
+          SizedBox(height: 8.h),
+          LeftRightText(
+            leftText: 'Payment Method',
+            rightText: cartData?.paymentOption?.titleLng ?? cartData?.paymentOption?.title ?? '',
+          ),
+          SizedBox(height: 8.h),
+          LeftRightText(
+            leftText: 'Placed on',
+            rightText: cartData?.createdDate ?? '',
+          ),
+          
+          // Special instructions
+          if (cartData?.specificInstructions != null && 
+              cartData!.specificInstructions!.isNotEmpty) ...[
+            SizedBox(height: 8.h),
+            LeftRightText(
+              leftText: 'Special Instructions',
+              rightText: cartData!.specificInstructions!,
+            ),
+          ],
+          
+          // Scheduled time
+          if (cartData?.scheduledDateTime != null) ...[
+            SizedBox(height: 8.h),
+            LeftRightText(
+              leftText: 'Scheduled for',
+              rightText: cartData!.scheduledDateTime!,
+            ),
+          ],
+          
+          SizedBox(height: 16.h),
+          const HorizontalLine(),
+          SizedBox(height: 16.h),
+          
+          // Payment summary
+          Text(
+            'Payment Summary',
+            style: TextStyle(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 16.h),
+          
+          // Subtotal
+          if ((cartData?.totalAmount ?? 0) > 0)
+            LeftRightText(
+              leftText: 'Subtotal',
+              rightText: 'AED ${cartData!.totalAmount.toStringAsFixed(2)}',
+            ),
+          
+          // Delivery fee
+          if ((cartData?.totalDeliveryFee ?? 0) > 0) ...[
+            SizedBox(height: 8.h),
+            LeftRightText(
+              leftText: 'Delivery Fee',
+              rightText: 'AED ${cartData!.totalDeliveryFee!.toStringAsFixed(2)}',
+            ),
+          ],
+          
+          // Service fee
+          if ((cartData?.totalServiceFee ?? 0) > 0) ...[
+            SizedBox(height: 8.h),
+            LeftRightText(
+              leftText: 'Service Fee',
+              rightText: 'AED ${cartData!.totalServiceFee!.toStringAsFixed(2)}',
+            ),
+          ],
+          
+          // Tax
+          if ((cartData?.taxableAmount ?? 0) > 0) ...[
+            SizedBox(height: 8.h),
+            LeftRightText(
+              leftText: 'Taxes & Fees',
+              rightText: 'AED ${cartData!.taxableAmount!.toStringAsFixed(2)}',
+            ),
+          ],
+          
+          // Discount
+          if ((cartData?.totalDiscount ?? 0) > 0) ...[
+            SizedBox(height: 8.h),
+            LeftRightText(
+              leftText: 'Discount',
+              rightText: '- AED ${cartData!.totalDiscount!.toStringAsFixed(2)}',
+              rightTextStyle: TextStyle(
+                color: Colors.green,
+                fontSize: 12.sp,
+              ),
+            ),
+          ],
+          
+          // Tip
+          if ((cartData?.tipAmount ?? 0) > 0) ...[
+            SizedBox(height: 8.h),
+            LeftRightText(
+              leftText: 'Tip Amount',
+              rightText: 'AED ${cartData!.tipAmount!.toStringAsFixed(2)}',
+            ),
+          ],
+          
+          SizedBox(height: 12.h),
+          Container(
+            height: 1,
+            color: Colors.grey[300],
+          ),
+          SizedBox(height: 12.h),
+          
+          // Total
+          LeftRightText(
+            leftText: 'Total',
+            rightText: 'AED ${cartData?.payableAmount?.toStringAsFixed(2) ?? '0.00'}',
+            leftTextStyle: TextStyle(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+            ),
+            rightTextStyle: TextStyle(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primaryColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

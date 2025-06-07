@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Yabalash</string>
+    <string name="facebook_app_id">3110267969188108</string>
+    <string name="fb_login_protocol_scheme">fb3110267969188108</string>
+    <string name="server_client_id">848426044866-4li9lq2l3ctie71bl9n2k9nq6jklh9a7.apps.googleusercontent.com</string>
+    <string name="google_api_key_id">AIzaSyCHehIUKqyXbRCXQ823_AJ0gZEAY0Bn2Os</string>
+</resources>

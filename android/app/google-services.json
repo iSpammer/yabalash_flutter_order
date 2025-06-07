@@ -1,0 +1,114 @@
+{
+  "project_info": {
+    "project_number": "848426044866",
+    "project_id": "yabalash-54ecd",
+    "storage_bucket": "yabalash-54ecd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:848426044866:android:cbc96dc637094944ec5a5b",
+        "android_client_info": {
+          "package_name": "com.yabalash.order"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "848426044866-b6ki8odarffauejeg2dk4563pregd4gb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yabalash.order",
+            "certificate_hash": "6e35fcb20bda370ed0025e8c1df6109a03d09b6e"
+          }
+        },
+        {
+          "client_id": "848426044866-ge1f3rfp1pgfel9ja9l6se63nrd7vkn6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yabalash.order",
+            "certificate_hash": "a88b766ebe08c535516406fab3741781973c03ad"
+          }
+        },
+        {
+          "client_id": "848426044866-um92i4l9ucnq7up5qn5us62gsome1am9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yabalash.order",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "848426044866-4li9lq2l3ctie71bl9n2k9nq6jklh9a7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCds1zQHa2AcHRIM2GY4G-DNwsJlLgYaO8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "848426044866-4li9lq2l3ctie71bl9n2k9nq6jklh9a7.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "848426044866-ec0690uavk1pks3dmj7totkd98ui8abk.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.yabalash.order"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:848426044866:android:8af7b96aef25e119ec5a5b",
+        "android_client_info": {
+          "package_name": "com.yabalash.orderv2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "848426044866-ubo3envvaruanblp9gblhi1lonvfs4bm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yabalash.orderv2",
+            "certificate_hash": "2ab4051546ab92db7f5698431cf6565600f74cda"
+          }
+        },
+        {
+          "client_id": "848426044866-4li9lq2l3ctie71bl9n2k9nq6jklh9a7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCds1zQHa2AcHRIM2GY4G-DNwsJlLgYaO8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "848426044866-4li9lq2l3ctie71bl9n2k9nq6jklh9a7.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "848426044866-ec0690uavk1pks3dmj7totkd98ui8abk.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.yabalash.order"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
