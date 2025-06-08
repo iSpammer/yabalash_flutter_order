@@ -41,7 +41,7 @@ class SurpriseBagsSection extends StatelessWidget {
               ),
               SizedBox(width: 12.w),
               Text(
-                'Surprise Bags',
+                'Featured Products',
                 style: TextStyle(
                   fontSize: 18.sp,
                   fontWeight: FontWeight.w600,

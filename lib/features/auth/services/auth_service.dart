@@ -260,12 +260,13 @@ class AuthService {
     final response = await _apiService.post<Map<String, dynamic>>(
       '/social/login/$provider',
       data: {
-        'social_id': socialData['id'],
+        'auth_id': socialData['id'],  // Changed from social_id to auth_id to match React Native
         'name': socialData['name'],
         'email': socialData['email'],
         'avatar': socialData['photo'],
         'device_type': deviceType,
         'device_token': deviceToken,
+        'fcm_token': deviceToken,  // Added fcm_token as expected by backend
         if (socialData['accessToken'] != null)
           'access_token': socialData['accessToken'],
         if (socialData['idToken'] != null)

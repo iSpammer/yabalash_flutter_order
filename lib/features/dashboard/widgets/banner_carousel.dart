@@ -37,9 +37,10 @@ class _BannerCarouselState extends State<BannerCarousel> {
             return _buildBannerItem(banner);
           },
           options: CarouselOptions(
-            height: 180.h,
-            viewportFraction: 0.9,
+            height: 200.h,
+            viewportFraction: 0.92,
             enlargeCenterPage: true,
+            enlargeFactor: 0.3,
             autoPlay: widget.banners.length > 1,
             autoPlayInterval: const Duration(seconds: 4),
             autoPlayAnimationDuration: const Duration(milliseconds: 800),
@@ -64,17 +65,18 @@ class _BannerCarouselState extends State<BannerCarousel> {
       child: Container(
         margin: EdgeInsets.symmetric(horizontal: 5.w),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(15.r),
+          borderRadius: BorderRadius.circular(20.r),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+              spreadRadius: -4,
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(15.r),
+          borderRadius: BorderRadius.circular(20.r),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -148,12 +150,13 @@ class _BannerCarouselState extends State<BannerCarousel> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: widget.banners.asMap().entries.map((entry) {
-        return Container(
-          width: 8.w,
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          width: _currentIndex == entry.key ? 24.w : 8.w,
           height: 8.w,
           margin: EdgeInsets.symmetric(horizontal: 3.w),
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(4.r),
             color: _currentIndex == entry.key
                 ? Theme.of(context).primaryColor
                 : Colors.grey[300],

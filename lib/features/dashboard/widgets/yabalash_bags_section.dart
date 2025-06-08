@@ -41,7 +41,7 @@ class YaBalashBagsSection extends StatelessWidget {
               ),
               SizedBox(width: 12.w),
               Text(
-                'YaBalash Bags',
+                'New Products',
                 style: TextStyle(
                   fontSize: 18.sp,
                   fontWeight: FontWeight.w600,
@@ -150,7 +150,8 @@ class YaBalashBagsSection extends StatelessWidget {
                   top: 8.h,
                   left: 8.w,
                   child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [Colors.purple[500]!, Colors.indigo[600]!],
@@ -209,7 +210,8 @@ class YaBalashBagsSection extends StatelessWidget {
                         ),
                       ),
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 8.w, vertical: 4.h),
                         decoration: BoxDecoration(
                           color: Theme.of(context).primaryColor,
                           borderRadius: BorderRadius.circular(8.r),

@@ -22,6 +22,8 @@ import '../../features/orders/screens/order_tracking_screen.dart';
 import '../../features/orders/screens/order_tracking_map_screen.dart';
 import '../../features/orders/screens/webview_tracking_screen.dart';
 import '../../features/profile/models/address_model.dart';
+import '../../features/dashboard/screens/section_all_items_screen.dart';
+import '../../features/dashboard/models/dashboard_section.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -185,6 +187,27 @@ class AppRouter {
         builder: (context, state) {
           final query = state.uri.queryParameters['query'];
           return SearchScreen(initialQuery: query);
+        },
+      ),
+      GoRoute(
+        path: '/section-all',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final section = extra?['section'] as DashboardSection?;
+          final sectionType = extra?['sectionType'] as String? ?? '';
+          
+          if (section == null) {
+            return const Scaffold(
+              body: Center(
+                child: Text('Section not found'),
+              ),
+            );
+          }
+          
+          return SectionAllItemsScreen(
+            section: section,
+            sectionType: sectionType,
+          );
         },
       ),
       GoRoute(

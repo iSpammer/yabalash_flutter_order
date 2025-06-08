@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
-import 'package:country_code_picker/country_code_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import '../../../core/widgets/custom_text_field.dart';
-import '../../../core/widgets/custom_button.dart';
+import '../../../core/widgets/custom_country_picker.dart';
 import '../../../core/utils/validators.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/services/social_login_service.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/animated_auth_background.dart';
+import '../widgets/animated_text_field.dart';
+import '../widgets/animated_auth_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -18,7 +19,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -26,17 +28,56 @@ class _LoginScreenState extends State<LoginScreen> {
   String _selectedCountryCode = AppConstants.defaultCountryCode;
   String _selectedDialCode = AppConstants.defaultDialCode;
   bool _isPhoneLogin = false;
+  bool _showPassword = false;
+  
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
     _loadRememberMeData();
+    
+    // Initialize animations
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeIn,
+    ));
+    
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+    ));
+    
+    // Start animations
+    _fadeController.forward();
+    _slideController.forward();
   }
   
   @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
+    _fadeController.dispose();
+    _slideController.dispose();
     super.dispose();
   }
   
@@ -86,229 +127,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(20.w),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(height: 50.h),
-                Text(
-                  'Welcome Back!',
-                  style: TextStyle(
-                    fontSize: 32.sp,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 10.h),
-                Text(
-                  'Sign in to continue',
-                  style: TextStyle(
-                    fontSize: 16.sp,
-                    color: Colors.grey[600],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 50.h),
-                Row(
-                  children: [
-                    if (_isPhoneLogin) ...[
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[300]!),
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                        child: CountryCodePicker(
-                          onChanged: (country) {
-                            setState(() {
-                              _selectedCountryCode = country.code ?? 'IN';
-                              _selectedDialCode = country.dialCode ?? '+91';
-                            });
-                          },
-                          initialSelection: _selectedCountryCode,
-                          favorite: const ['+91', 'IN'],
-                          showCountryOnly: false,
-                          showOnlyCountryWhenClosed: false,
-                          alignLeft: false,
-                          padding: EdgeInsets.zero,
-                        ),
-                      ),
-                      SizedBox(width: 10.w),
-                    ],
-                    Expanded(
-                      child: CustomTextField(
-                        controller: _usernameController,
-                        hintText: 'Email or Phone Number',
-                        labelText: 'Email or Phone',
-                        prefixIcon: _isPhoneLogin ? Icons.phone : Icons.email,
-                        keyboardType: TextInputType.emailAddress,
-                        onChanged: _detectInputType,
-                        validator: Validators.validateEmailOrPhone,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 20.h),
-                Consumer<AuthProvider>(
-                  builder: (context, authProvider, _) {
-                    return CustomTextField(
-                      controller: _passwordController,
-                      hintText: 'Enter your password',
-                      labelText: 'Password',
-                      prefixIcon: Icons.lock,
-                      obscureText: !authProvider.isPasswordVisible,
-                      validator: Validators.validatePassword,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          authProvider.isPasswordVisible
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                          color: Colors.grey,
-                        ),
-                        onPressed: () {
-                          authProvider.togglePasswordVisibility();
-                        },
-                      ),
-                    );
-                  },
-                ),
-                SizedBox(height: 20.h),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Consumer<AuthProvider>(
-                      builder: (context, authProvider, _) {
-                        return Row(
-                          children: [
-                            Checkbox(
-                              value: authProvider.rememberMe,
-                              onChanged: (_) {
-                                authProvider.toggleRememberMe();
-                              },
-                              activeColor: Theme.of(context).primaryColor,
-                            ),
-                            Text(
-                              'Remember me',
-                              style: TextStyle(
-                                fontSize: 14.sp,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        context.push('/forgot-password');
-                      },
-                      child: Text(
-                        'Forgot Password?',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          color: Theme.of(context).primaryColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 30.h),
-                Consumer<AuthProvider>(
-                  builder: (context, authProvider, _) {
-                    return Column(
-                      children: [
-                        CustomButton(
-                          text: 'Sign In',
-                          onPressed: _handleLogin,
-                          isLoading: authProvider.isLoading,
-                        ),
-                        if (authProvider.errorMessage != null) ...[
-                          SizedBox(height: 10.h),
-                          Container(
-                            padding: EdgeInsets.all(12.w),
-                            decoration: BoxDecoration(
-                              color: Colors.red[50],
-                              borderRadius: BorderRadius.circular(8.r),
-                            ),
-                            child: Text(
-                              authProvider.errorMessage!,
-                              style: TextStyle(
-                                color: Colors.red[700],
-                                fontSize: 14.sp,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ],
-                      ],
-                    );
-                  },
-                ),
-                SizedBox(height: 30.h),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Divider(color: Colors.grey[300]),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10.w),
-                      child: Text(
-                        'OR',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14.sp,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Divider(color: Colors.grey[300]),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 30.h),
-                _buildSocialLoginButtons(),
-                SizedBox(height: 30.h),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Don't have an account? ",
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        context.push('/register');
-                      },
-                      child: Text(
-                        'Sign Up',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          color: Theme.of(context).primaryColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _handleSocialLogin(String provider) async {
     try {
       Map<String, dynamic>? socialData;
@@ -351,43 +169,386 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Widget _buildSocialLoginButtons() {
-    return Column(
-      children: [
-        CustomButton(
-          text: 'Continue with Google',
-          onPressed: () => _handleSocialLogin('google'),
-          outlined: true,
-          icon: Icon(
-            Icons.g_mobiledata,
-            size: 24.sp,
-          ),
-        ),
-        SizedBox(height: 12.h),
-        CustomButton(
-          text: 'Continue with Facebook',
-          onPressed: () => _handleSocialLogin('facebook'),
-          outlined: true,
-          icon: Icon(
-            Icons.facebook,
-            size: 24.sp,
-            color: const Color(0xFF1877F2),
-          ),
-        ),
-        if (Theme.of(context).platform == TargetPlatform.iOS) ...[
-          SizedBox(height: 12.h),
-          CustomButton(
-            text: 'Continue with Apple',
-            onPressed: () => _handleSocialLogin('apple'),
-            backgroundColor: Colors.black,
-            icon: Icon(
-              Icons.apple,
-              size: 24.sp,
-              color: Colors.white,
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedAuthBackground(
+      child: SafeArea(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 24.w),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(height: 60.h),
+                    
+                    // Logo and Title with animation
+                    TweenAnimationBuilder<double>(
+                      duration: const Duration(milliseconds: 1200),
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      builder: (context, value, child) {
+                        return Transform.scale(
+                          scale: value,
+                          child: Opacity(
+                            opacity: value,
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 100.w,
+                                  height: 100.w,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Theme.of(context).primaryColor,
+                                        Theme.of(context).primaryColor.withValues(alpha: 0.7),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                                        blurRadius: 30,
+                                        offset: const Offset(0, 15),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    Icons.restaurant_menu,
+                                    size: 50.sp,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(height: 24.h),
+                                Text(
+                                  'Welcome Back',
+                                  style: TextStyle(
+                                    fontSize: 32.sp,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                                SizedBox(height: 8.h),
+                                Text(
+                                  'Sign in to continue',
+                                  style: TextStyle(
+                                    fontSize: 16.sp,
+                                    color: Colors.grey[600],
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    
+                    SizedBox(height: 50.h),
+                    
+                    // Email/Phone field
+                    Row(
+                      children: [
+                        if (_isPhoneLogin) ...[
+                          Container(
+                            width: 120.w,
+                            height: 64.h,
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey[300]!),
+                              borderRadius: BorderRadius.circular(16.r),
+                              color: Colors.grey[50],
+                            ),
+                            child: CustomCountryPicker(
+                              onChanged: (country) {
+                                setState(() {
+                                  _selectedCountryCode = country.code ?? 'IN';
+                                  _selectedDialCode = country.dialCode ?? '+91';
+                                });
+                              },
+                              initialSelection: _selectedCountryCode,
+                              favorite: const ['+91', 'IN'],
+                              showCountryOnly: false,
+                              showOnlyCountryWhenClosed: false,
+                              alignLeft: false,
+                              padding: EdgeInsets.zero,
+                            ),
+                          ),
+                          SizedBox(width: 12.w),
+                        ],
+                        Expanded(
+                          child: AnimatedTextField(
+                            controller: _usernameController,
+                            hintText: _isPhoneLogin ? 'Phone number' : 'Email or Phone',
+                            labelText: _isPhoneLogin ? 'Phone' : 'Email/Phone',
+                            prefixIcon: _isPhoneLogin ? Icons.phone : Icons.person_outline,
+                            keyboardType: _isPhoneLogin ? TextInputType.phone : TextInputType.emailAddress,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your ${_isPhoneLogin ? 'phone number' : 'email or phone'}';
+                              }
+                              if (_isPhoneLogin) {
+                                return Validators.validatePhone(value);
+                              }
+                              return null;
+                            },
+                            onTap: () {
+                              _detectInputType(_usernameController.text);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 20.h),
+                    
+                    // Password field
+                    AnimatedTextField(
+                      controller: _passwordController,
+                      hintText: 'Enter your password',
+                      labelText: 'Password',
+                      prefixIcon: Icons.lock_outline,
+                      obscureText: !_showPassword,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your password';
+                        }
+                        return null;
+                      },
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _showPassword ? Icons.visibility_off : Icons.visibility,
+                          color: Colors.grey[600],
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _showPassword = !_showPassword;
+                          });
+                        },
+                      ),
+                    ),
+                    
+                    SizedBox(height: 20.h),
+                    
+                    // Remember me & Forgot password
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Consumer<AuthProvider>(
+                          builder: (context, authProvider, _) {
+                            return Row(
+                              children: [
+                                Transform.scale(
+                                  scale: 1.2,
+                                  child: Checkbox(
+                                    value: authProvider.rememberMe,
+                                    onChanged: (value) {
+                                      authProvider.setRememberMe(value ?? false);
+                                    },
+                                    activeColor: Theme.of(context).primaryColor,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(4.r),
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  'Remember me',
+                                  style: TextStyle(
+                                    fontSize: 14.sp,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            context.push('/forgot-password');
+                          },
+                          child: Text(
+                            'Forgot Password?',
+                            style: TextStyle(
+                              fontSize: 14.sp,
+                              color: Theme.of(context).primaryColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 30.h),
+                    
+                    // Sign In button
+                    Consumer<AuthProvider>(
+                      builder: (context, authProvider, _) {
+                        return Column(
+                          children: [
+                            AnimatedAuthButton(
+                              text: 'Sign In',
+                              onPressed: _handleLogin,
+                              isLoading: authProvider.isLoading,
+                            ),
+                            if (authProvider.errorMessage != null) ...[
+                              SizedBox(height: 16.h),
+                              Container(
+                                padding: EdgeInsets.all(12.w),
+                                decoration: BoxDecoration(
+                                  color: Colors.red[50],
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(color: Colors.red[200]!),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.error_outline,
+                                      color: Colors.red[700],
+                                      size: 20.sp,
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: Text(
+                                        authProvider.errorMessage!,
+                                        style: TextStyle(
+                                          color: Colors.red[700],
+                                          fontSize: 14.sp,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        );
+                      },
+                    ),
+                    
+                    SizedBox(height: 40.h),
+                    
+                    // OR divider
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 1,
+                            color: Colors.grey[300],
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16.w),
+                          child: Text(
+                            'OR',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Container(
+                            height: 1,
+                            color: Colors.grey[300],
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 30.h),
+                    
+                    // Social login buttons
+                    Column(
+                      children: [
+                        AnimatedAuthButton(
+                          text: 'Continue with Google',
+                          onPressed: () => _handleSocialLogin('google'),
+                          outlined: true,
+                          icon: Image.asset(
+                            'assets/icons/google.png',
+                            width: 24.w,
+                            height: 24.w,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Icon(
+                                Icons.g_mobiledata,
+                                size: 24.sp,
+                                color: Theme.of(context).primaryColor,
+                              );
+                            },
+                          ),
+                        ),
+                        SizedBox(height: 12.h),
+                        AnimatedAuthButton(
+                          text: 'Continue with Facebook',
+                          onPressed: () => _handleSocialLogin('facebook'),
+                          outlined: true,
+                          backgroundColor: const Color(0xFF1877F2),
+                          textColor: const Color(0xFF1877F2),
+                          icon: Icon(
+                            Icons.facebook,
+                            size: 24.sp,
+                            color: const Color(0xFF1877F2),
+                          ),
+                        ),
+                        if (Theme.of(context).platform == TargetPlatform.iOS) ...[
+                          SizedBox(height: 12.h),
+                          AnimatedAuthButton(
+                            text: 'Continue with Apple',
+                            onPressed: () => _handleSocialLogin('apple'),
+                            backgroundColor: Colors.black,
+                            icon: Icon(
+                              Icons.apple,
+                              size: 24.sp,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    
+                    SizedBox(height: 40.h),
+                    
+                    // Sign up link
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Don't have an account? ",
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () {
+                            context.push('/register');
+                          },
+                          child: Text(
+                            'Sign Up',
+                            style: TextStyle(
+                              fontSize: 14.sp,
+                              color: Theme.of(context).primaryColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 40.h),
+                  ],
+                ),
+              ),
             ),
           ),
-        ],
-      ],
+        ),
+      ),
     );
   }
 }

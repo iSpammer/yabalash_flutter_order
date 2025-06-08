@@ -20,15 +20,27 @@ class DashboardSection {
   });
 
   factory DashboardSection.fromJson(Map<String, dynamic> json) {
+    // Parse translations first to determine the actual title
+    final translations = json['translations'] != null
+        ? List<Translation>.from(
+            json['translations'].map((x) => Translation.fromJson(x)))
+        : null;
+    
+    // Get translated title if available
+    String title = json['title'] ?? '';
+    if (translations != null && translations.isNotEmpty) {
+      final translatedTitle = translations.first.title;
+      if (translatedTitle.isNotEmpty) {
+        title = translatedTitle;
+      }
+    }
+    
     return DashboardSection(
       id: json['id'] ?? 0,
       slug: json['slug'] ?? '',
-      title: json['title'] ?? '',
+      title: title,
       data: json['data'] != null ? List<dynamic>.from(json['data']) : [],
-      translations: json['translations'] != null
-          ? List<Translation>.from(
-              json['translations'].map((x) => Translation.fromJson(x)))
-          : null,
+      translations: translations,
       bannerImage: json['banner_image'] != null
           ? List<dynamic>.from(json['banner_image'])
           : null,
@@ -51,9 +63,22 @@ class DashboardSection {
 
   // Check if section should be displayed
   bool get shouldDisplay {
+    // Always display sections that might have dynamic content
+    if (slug == 'dynamic_page' || slug == 'dynamic_html') {
+      return true;
+    }
+    
+    // Check banner sections for banner images
     if (slug == 'banner') {
       return bannerImage != null && bannerImage!.isNotEmpty;
     }
+    
+    // For sections that might have null data (like recent_orders), check if data is actually null
+    if (slug == 'recent_orders' || slug == 'ordered_products') {
+      return true; // Let the widget handle empty state
+    }
+    
+    // For all other sections, check if data is not empty
     return data.isNotEmpty;
   }
 

@@ -25,12 +25,13 @@ class RestaurantCardV2 extends StatelessWidget {
         margin: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16.r),
+          borderRadius: BorderRadius.circular(20.r),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+              spreadRadius: -4,
             ),
           ],
         ),
@@ -43,19 +44,36 @@ class RestaurantCardV2 extends StatelessWidget {
     return Stack(
       children: [
         Container(
-          padding: EdgeInsets.all(12.w),
+          padding: EdgeInsets.all(16.w),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildRestaurantImage(width: 100.w, height: 100.w),
-              SizedBox(width: 12.w),
+              // Enhanced image with gradient overlay
+              Hero(
+                tag: 'restaurant-${restaurant.id}-card',
+                child: Container(
+                  width: 110.w,
+                  height: 110.w,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: _buildRestaurantImage(width: 110.w, height: 110.w),
+                ),
+              ),
+              SizedBox(width: 16.w),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _buildRestaurantInfo(context),
-                    SizedBox(height: 8.h),
+                    SizedBox(height: 10.h),
                     _buildMetaInfo(context),
                   ],
                 ),
@@ -409,57 +427,93 @@ class RestaurantCardV2 extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Text(
-                restaurant.name ?? 'Restaurant',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                  color: isRestaurantClosed ? Colors.grey : Colors.black87,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    restaurant.name ?? 'Restaurant',
+                    style: TextStyle(
+                      fontSize: 17.sp,
+                      fontWeight: FontWeight.w700,
+                      color: isRestaurantClosed ? Colors.grey : Colors.black87,
+                      letterSpacing: -0.5,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 4.h),
+                  Row(
+                    children: [
+                      if (restaurant.rating != null && restaurant.rating! > 0) ...[
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                _getRatingColor(restaurant.rating!),
+                                _getRatingColor(restaurant.rating!).withOpacity(0.8),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(8.r),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _getRatingColor(restaurant.rating!).withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.star_rounded,
+                                color: Colors.white,
+                                size: 14.sp,
+                              ),
+                              SizedBox(width: 3.w),
+                              Text(
+                                restaurant.rating!.toStringAsFixed(1),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if (restaurant.reviewCount != null && restaurant.reviewCount! > 0) ...[
+                                SizedBox(width: 4.w),
+                                Text(
+                                  '(${restaurant.reviewCount})',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontSize: 11.sp,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: 8.w),
+                      ],
+                      Expanded(
+                        child: Text(
+                          _getCuisinesText(),
+                          style: TextStyle(
+                            fontSize: 13.sp,
+                            color: isRestaurantClosed ? Colors.grey[400] : Colors.grey[700],
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            if (restaurant.rating != null && restaurant.rating! > 0) ...[
-              SizedBox(width: 8.w),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                decoration: BoxDecoration(
-                  color: _getRatingColor(restaurant.rating!),
-                  borderRadius: BorderRadius.circular(4.r),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.star,
-                      color: Colors.white,
-                      size: 12.sp,
-                    ),
-                    SizedBox(width: 2.w),
-                    Text(
-                      restaurant.rating!.toStringAsFixed(1),
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ],
-        ),
-        SizedBox(height: 4.h),
-        Text(
-          _getCuisinesText(),
-          style: TextStyle(
-            fontSize: 13.sp,
-            color: isRestaurantClosed ? Colors.grey[400] : Colors.grey[600],
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -469,285 +523,195 @@ class RestaurantCardV2 extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // First row: Distance, time, and address
-        Row(
-          children: [
-            if (restaurant.formattedDistance != null) ...[
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(6.r),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.location_on,
-                      color: isRestaurantClosed ? Colors.grey[400] : Colors.blue[600],
-                      size: 12.sp,
-                    ),
-                    SizedBox(width: 2.w),
-                    Text(
-                      restaurant.formattedDistance!,
-                      style: TextStyle(
-                        fontSize: 11.sp,
-                        color: isRestaurantClosed ? Colors.grey[400] : Colors.blue[800],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: 8.w),
-            ],
-            if (restaurant.formattedDeliveryTime != null) ...[
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                decoration: BoxDecoration(
-                  color: Colors.purple[50],
-                  borderRadius: BorderRadius.circular(6.r),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.schedule,
-                      color: isRestaurantClosed ? Colors.grey[400] : Colors.purple[600],
-                      size: 12.sp,
-                    ),
-                    SizedBox(width: 2.w),
-                    Text(
-                      restaurant.formattedDeliveryTime!,
-                      style: TextStyle(
-                        fontSize: 11.sp,
-                        color: isRestaurantClosed ? Colors.grey[400] : Colors.purple[800],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-        
-        if (restaurant.address != null) ...[
-          SizedBox(height: 6.h),
-          Row(
+        // First row: Delivery info with enhanced design
+        Container(
+          padding: EdgeInsets.symmetric(vertical: 8.h),
+          child: Row(
             children: [
-              Icon(
-                Icons.place_outlined,
-                color: isRestaurantClosed ? Colors.grey[400] : Colors.grey[500],
-                size: 12.sp,
-              ),
-              SizedBox(width: 4.w),
-              Expanded(
-                child: Text(
-                  restaurant.address!,
-                  style: TextStyle(
-                    fontSize: 11.sp,
-                    color: isRestaurantClosed ? Colors.grey[400] : Colors.grey[600],
-                    height: 1.2,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+              if (restaurant.formattedDistance != null) ...[
+                _buildInfoChip(
+                  icon: Icons.location_on_rounded,
+                  text: restaurant.formattedDistance!,
+                  iconColor: Colors.blue[600]!,
+                  backgroundColor: Colors.blue[50]!,
                 ),
-              ),
+                SizedBox(width: 8.w),
+              ],
+              if (restaurant.formattedDeliveryTime != null) ...[
+                _buildInfoChip(
+                  icon: Icons.access_time_rounded,
+                  text: restaurant.formattedDeliveryTime!,
+                  iconColor: Colors.orange[600]!,
+                  backgroundColor: Colors.orange[50]!,
+                ),
+                SizedBox(width: 8.w),
+              ],
+              if (restaurant.minimumOrderAmount != null && restaurant.minimumOrderAmount! > 0) ...[
+                _buildInfoChip(
+                  icon: Icons.shopping_basket_rounded,
+                  text: 'Min AED ${restaurant.minimumOrderAmount!.toStringAsFixed(0)}',
+                  iconColor: Colors.purple[600]!,
+                  backgroundColor: Colors.purple[50]!,
+                ),
+              ],
             ],
           ),
-        ],
-        
-        SizedBox(height: 8.h),
-        
-        // Second row: Delivery information
-        Wrap(
-          spacing: 6.w,
-          runSpacing: 4.h,
-          children: [
-            if (restaurant.deliveryFee != null) 
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                decoration: BoxDecoration(
-                  color: restaurant.deliveryFee == 0 ? Colors.green[50] : Colors.orange[50],
-                  borderRadius: BorderRadius.circular(8.r),
-                  border: Border.all(
-                    color: restaurant.deliveryFee == 0 ? Colors.green[200]! : Colors.orange[200]!,
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      restaurant.deliveryFee == 0 ? Icons.delivery_dining : Icons.local_shipping,
-                      size: 14.sp,
-                      color: isRestaurantClosed 
-                          ? Colors.grey[400] 
-                          : restaurant.deliveryFee == 0 
-                              ? Colors.green[700] 
-                              : Colors.orange[700],
-                    ),
-                    SizedBox(width: 4.w),
-                    Text(
-                      restaurant.deliveryFee == 0 
-                          ? 'FREE DELIVERY' 
-                          : '\$${restaurant.deliveryFee!.toStringAsFixed(2)} delivery',
-                      style: TextStyle(
-                        fontSize: 11.sp,
-                        color: isRestaurantClosed 
-                            ? Colors.grey[400] 
-                            : restaurant.deliveryFee == 0 
-                                ? Colors.green[800] 
-                                : Colors.orange[800],
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            if (restaurant.minimumOrderAmount != null && restaurant.minimumOrderAmount! > 0) 
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                decoration: BoxDecoration(
-                  color: Colors.indigo[50],
-                  borderRadius: BorderRadius.circular(8.r),
-                  border: Border.all(color: Colors.indigo[200]!, width: 1),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.shopping_basket,
-                      size: 14.sp,
-                      color: isRestaurantClosed ? Colors.grey[400] : Colors.indigo[700],
-                    ),
-                    SizedBox(width: 4.w),
-                    Text(
-                      'Min \$${restaurant.minimumOrderAmount!.toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontSize: 11.sp,
-                        color: isRestaurantClosed ? Colors.grey[400] : Colors.indigo[800],
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
         ),
         
-        SizedBox(height: 8.h),
-        
-        // Third row: Service types and special features (Fixed overflow)
-        SizedBox(
-          height: 24.h,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+        // Delivery fee badge with enhanced design
+        if (restaurant.deliveryFee != null) ...[
+          Container(
+            margin: EdgeInsets.only(bottom: 8.h),
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: restaurant.deliveryFee == 0 
+                    ? [Colors.green[400]!, Colors.green[600]!]
+                    : [Colors.grey[100]!, Colors.grey[200]!],
+              ),
+              borderRadius: BorderRadius.circular(12.r),
+              boxShadow: restaurant.deliveryFee == 0 ? [
+                BoxShadow(
+                  color: Colors.green.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ] : null,
+            ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Service Types
-                if (restaurant.isPickupAvailable == true || restaurant.isDeliveryAvailable == true) ...[
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                    decoration: BoxDecoration(
-                      color: Colors.teal[50],
-                      borderRadius: BorderRadius.circular(6.r),
-                      border: Border.all(color: Colors.teal[200]!, width: 1),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.room_service,
-                          size: 12.sp,
-                          color: isRestaurantClosed ? Colors.grey[400] : Colors.teal[700],
-                        ),
-                        SizedBox(width: 3.w),
-                        Text(
-                          _getServiceTypes(),
-                          style: TextStyle(
-                            fontSize: 10.sp,
-                            color: isRestaurantClosed ? Colors.grey[400] : Colors.teal[800],
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
+                Icon(
+                  Icons.delivery_dining_rounded,
+                  size: 16.sp,
+                  color: restaurant.deliveryFee == 0 ? Colors.white : Colors.grey[700],
+                ),
+                SizedBox(width: 6.w),
+                Text(
+                  restaurant.deliveryFee == 0 
+                      ? 'FREE DELIVERY' 
+                      : 'AED ${restaurant.deliveryFee!.toStringAsFixed(0)} Delivery',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: restaurant.deliveryFee == 0 ? Colors.white : Colors.grey[700],
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
                   ),
-                  SizedBox(width: 4.w),
-                ],
-                
-                // Pure Veg
-                if (restaurant.isPureVeg == true) ...[
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                    decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(6.r),
-                      border: Border.all(color: Colors.green[300]!, width: 1),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8.w,
-                          height: 8.w,
-                          decoration: const BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        SizedBox(width: 3.w),
-                        Text(
-                          'PURE VEG',
-                          style: TextStyle(
-                            fontSize: 10.sp,
-                            color: isRestaurantClosed ? Colors.grey[400] : Colors.green[800],
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(width: 4.w),
-                ],
-                
-                // Tags (limited to 1 to prevent overflow)
-                if (restaurant.tags != null && restaurant.tags!.isNotEmpty) ...[
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                    decoration: BoxDecoration(
-                      color: Colors.purple[50],
-                      borderRadius: BorderRadius.circular(6.r),
-                      border: Border.all(color: Colors.purple[200]!, width: 1),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.star_border,
-                          size: 10.sp,
-                          color: isRestaurantClosed ? Colors.grey[400] : Colors.purple[700],
-                        ),
-                        SizedBox(width: 3.w),
-                        Text(
-                          restaurant.tags!.first.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 9.sp,
-                            color: isRestaurantClosed ? Colors.grey[400] : Colors.purple[800],
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ],
             ),
           ),
-        ),
+        ],
+        
+        // Special features row
+        if (restaurant.promoDiscount != null || 
+            restaurant.isPureVeg == true || 
+            (restaurant.tags != null && restaurant.tags!.isNotEmpty)) ...[
+          Wrap(
+            spacing: 6.w,
+            runSpacing: 6.h,
+            children: [
+              if (restaurant.promoDiscount != null && restaurant.promoDiscount!.isNotEmpty)
+                _buildFeatureBadge(
+                  icon: Icons.local_offer_rounded,
+                  text: restaurant.promoDiscount!.toUpperCase(),
+                  gradient: [Colors.red[400]!, Colors.pink[500]!],
+                ),
+              if (restaurant.isPureVeg == true)
+                _buildFeatureBadge(
+                  icon: Icons.eco_rounded,
+                  text: 'PURE VEG',
+                  gradient: [Colors.green[400]!, Colors.green[600]!],
+                ),
+              if (restaurant.tags != null && restaurant.tags!.isNotEmpty)
+                _buildFeatureBadge(
+                  icon: Icons.star_rounded,
+                  text: restaurant.tags!.first.toUpperCase(),
+                  gradient: [Colors.purple[400]!, Colors.purple[600]!],
+                ),
+            ],
+          ),
+        ],
       ],
+    );
+  }
+
+  Widget _buildFeatureBadge({
+    required IconData icon,
+    required String text,
+    required List<Color> gradient,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: gradient),
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: gradient.first.withOpacity(0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: Colors.white,
+            size: 12.sp,
+          ),
+          SizedBox(width: 3.w),
+          Text(
+            text,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 10.sp,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoChip({
+    required IconData icon,
+    required String text,
+    required Color iconColor,
+    required Color backgroundColor,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+      decoration: BoxDecoration(
+        color: isRestaurantClosed ? Colors.grey[100] : backgroundColor,
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(
+          color: isRestaurantClosed ? Colors.grey[300]! : backgroundColor.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: isRestaurantClosed ? Colors.grey[400] : iconColor,
+            size: 14.sp,
+          ),
+          SizedBox(width: 4.w),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12.sp,
+              color: isRestaurantClosed ? Colors.grey[400] : iconColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

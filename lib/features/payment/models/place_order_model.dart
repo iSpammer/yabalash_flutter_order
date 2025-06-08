@@ -13,6 +13,7 @@ class PlaceOrderRequest {
   final String? expiryYear;
   final String? cvv;
   final String? transactionId;
+  final String orderType; // Add order type field
 
   PlaceOrderRequest({
     required this.selectedAddressId,
@@ -29,13 +30,14 @@ class PlaceOrderRequest {
     this.expiryYear,
     this.cvv,
     this.transactionId,
+    this.orderType = 'delivery', // Default to delivery
   });
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'address_id': selectedAddressId,
       'payment_option_id': paymentOptionId,
-      'order_type': 'delivery', // Default to delivery
+      'order_type': orderType, // Use the dynamic order type
       'tip_amount': tip ?? 0,
       'currency_id': 1, // Add currency_id - matches the header currency value
     };

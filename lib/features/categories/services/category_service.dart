@@ -73,8 +73,9 @@ class CategoryService {
         queryParams.addAll(filters.toQueryParameters());
       }
 
+      // Get category products - the API returns products in the category endpoint itself
       final response = await _apiService.get<Map<String, dynamic>>(
-        '/category/$categoryId/products',
+        '/category/$categoryId',
         queryParameters: queryParams,
       );
 

@@ -210,58 +210,92 @@ class RestaurantService {
   Future<ApiResponse<List<MenuCategoryModel>>> getVendorCategories({
     required int vendorId,
   }) async {
+    // Use vendor/category/list endpoint like React Native does
     final response = await _apiService.post<Map<String, dynamic>>(
-      '/vendorCategory',
+      '/vendor/category/list',
       data: {
         'vendor_id': vendorId,
       },
     );
     
     if (response.success && response.data != null) {
-      final categoriesData = response.data!['data'] ?? response.data!;
-      final categories = (categoriesData as List?)
-          ?.map((e) => MenuCategoryModel.fromJson(e))
-          .toList() ?? [];
-      return ApiResponse.success(data: categories);
-    }
-    
-    // If vendorCategory endpoint fails (404), try getting all vendor products
-    // and create categories from them
-    if (response.statusCode == 404) {
-      final productsResponse = await getVendorProducts(vendorId: vendorId);
-      if (productsResponse.success && productsResponse.data != null) {
-        // Group products by category to create categories
-        final Map<int, List<ProductModel>> groupedProducts = {};
-        for (final product in productsResponse.data!) {
-          if (!groupedProducts.containsKey(product.categoryId)) {
-            groupedProducts[product.categoryId] = [];
-          }
-          groupedProducts[product.categoryId]!.add(product);
-        }
-        
-        final categories = groupedProducts.entries.map((entry) {
-          final categoryId = entry.key;
-          final products = entry.value;
-          final categoryName = products.first.categoryName ?? 'Category $categoryId';
-          
-          return MenuCategoryModel(
-            id: categoryId,
-            name: categoryName,
-            description: null,
-            image: null,
-            position: categoryId,
-            isActive: true,
-            productCount: products.length,
-          );
-        }).toList();
-        
+      // The response can be either:
+      // 1. Direct array of categories: response.data = [...]
+      // 2. Wrapped in data field: response.data = { data: [...] }
+      List<dynamic>? categoriesData;
+      
+      if (response.data is List) {
+        categoriesData = response.data as List;
+      } else if (response.data is Map && response.data!['data'] is List) {
+        categoriesData = response.data!['data'] as List;
+      }
+      
+      if (categoriesData != null) {
+        final categories = categoriesData
+            .map((e) => MenuCategoryModel.fromJson(e))
+            .toList();
         return ApiResponse.success(data: categories);
       }
     }
     
+    // If vendor/category/list fails, try to get vendor details which includes products
+    try {
+      final vendorResponse = await _apiService.get(
+        '/vendor/$vendorId',
+      );
+      
+      if (vendorResponse.success && vendorResponse.data != null) {
+        final vendorData = vendorResponse.data!['data'] ?? vendorResponse.data!;
+        
+        // Extract products and create categories from them
+        if (vendorData['products'] != null) {
+          final productsData = vendorData['products'];
+          List<ProductModel> products = [];
+          
+          if (productsData is Map && productsData['data'] is List) {
+            products = (productsData['data'] as List)
+                .map((p) => ProductModel.fromJson(p))
+                .toList();
+          } else if (productsData is List) {
+            products = productsData
+                .map((p) => ProductModel.fromJson(p))
+                .toList();
+          }
+          
+          // Group products by category
+          final Map<int, List<ProductModel>> groupedProducts = {};
+          for (final product in products) {
+            if (!groupedProducts.containsKey(product.categoryId)) {
+              groupedProducts[product.categoryId] = [];
+            }
+            groupedProducts[product.categoryId]!.add(product);
+          }
+          
+          final categories = groupedProducts.entries.map((entry) {
+            final categoryId = entry.key;
+            final categoryProducts = entry.value;
+            final categoryName = categoryProducts.first.categoryName ?? 'Category $categoryId';
+            
+            return MenuCategoryModel(
+              id: categoryId,
+              name: categoryName,
+              description: null,
+              image: null,
+              position: categoryId,
+              isActive: true,
+              productCount: categoryProducts.length,
+            );
+          }).toList();
+          
+          return ApiResponse.success(data: categories);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching vendor data: $e');
+    }
+    
     return ApiResponse.error(
-      message: response.message ?? 'Failed to load categories',
-      errors: response.errors,
+      message: 'Failed to load categories',
     );
   }
   
@@ -305,23 +339,34 @@ class RestaurantService {
     int page = 1,
     int limit = 50,
   }) async {
-    final response = await _apiService.post<Map<String, dynamic>>(
-      '/vendorProducts',
-      data: {
-        'vendor_id': vendorId,
-        'page': page,
-        'limit': limit,
+    // Use the vendor endpoint which includes products
+    final response = await _apiService.get<Map<String, dynamic>>(
+      '/vendor/$vendorId',
+      queryParameters: {
+        'page': page.toString(),
+        'limit': limit.toString(),
       },
     );
     
     if (response.success && response.data != null) {
-      final productsData = response.data!['data']?['products'] ?? 
-                          response.data!['products'] ?? 
-                          response.data!['data'] ?? 
-                          response.data!;
-      final products = (productsData as List?)
-          ?.map((e) => ProductModel.fromJson(e))
-          .toList() ?? [];
+      final vendorData = response.data!['data'] ?? response.data!;
+      List<ProductModel> products = [];
+      
+      // Extract products from vendor response
+      if (vendorData['products'] != null) {
+        final productsData = vendorData['products'];
+        
+        if (productsData is Map && productsData['data'] is List) {
+          products = (productsData['data'] as List)
+              .map((p) => ProductModel.fromJson(p))
+              .toList();
+        } else if (productsData is List) {
+          products = productsData
+              .map((p) => ProductModel.fromJson(p))
+              .toList();
+        }
+      }
+      
       return ApiResponse.success(data: products);
     }
     

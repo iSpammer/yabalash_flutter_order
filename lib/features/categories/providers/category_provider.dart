@@ -118,7 +118,8 @@ class CategoryProvider extends ChangeNotifier {
         _categoryDetail = response.data;
         _categoryError = null;
         
-        // Load products after category details are loaded
+        // For now, always try to load products
+        // TODO: Handle vendor categories differently
         await loadProducts(categoryId, refresh: true);
       } else {
         _categoryError = response.message ?? 'Failed to load category details';

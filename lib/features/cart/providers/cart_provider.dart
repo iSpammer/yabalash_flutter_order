@@ -3,6 +3,7 @@ import '../models/cart_model.dart';
 import '../services/cart_service.dart';
 import '../services/product_variant_service.dart';
 import '../../restaurants/models/product_model.dart';
+import '../../dashboard/widgets/delivery_pickup_toggle.dart';
 
 class CartProvider extends ChangeNotifier {
   final CartService _cartService = CartService();
@@ -14,6 +15,7 @@ class CartProvider extends ChangeNotifier {
   int _itemCount = 0;
   double _totalAmount = 0.0;
   int? _currentVendorId;
+  DeliveryMode _deliveryMode = DeliveryMode.delivery; // Add delivery mode
   
   // Selected options for checkout
   int? _selectedAddressId;

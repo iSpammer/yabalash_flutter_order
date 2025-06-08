@@ -2305,7 +2305,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
               children: [
                 // Beautiful Product Image
                 Hero(
-                  tag: 'product_${product.id}',
+                  tag: 'order-detail-product-${product.id}',
                   child: Container(
                     width: 85.w,
                     height: 85.w,

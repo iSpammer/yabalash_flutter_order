@@ -26,6 +26,9 @@ class SocialLoginService {
   // Google Sign-In
   Future<Map<String, dynamic>?> signInWithGoogle() async {
     try {
+      // Sign out first to ensure fresh login (matching React Native behavior)
+      await _googleSignIn.signOut();
+      
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return null;
 

@@ -133,8 +133,14 @@ class DashboardService {
       
       final sections = homePageLabels
           .map((sectionJson) => DashboardSection.fromJson(sectionJson))
-          .where((section) => section.shouldDisplay)
+          .where((section) {
+            // Debug each section
+            debugPrint('[Dashboard Service] Section ${section.slug} (${section.title}): shouldDisplay=${section.shouldDisplay}, dataLength=${section.data.length}');
+            return section.shouldDisplay;
+          })
           .toList();
+      
+      debugPrint('[Dashboard Service] Total sections after filtering: ${sections.length}');
       
       return ApiResponse.success(data: sections);
     }

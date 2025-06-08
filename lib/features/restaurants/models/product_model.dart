@@ -124,6 +124,20 @@ class ProductModel {
     }
     return null;
   }
+  
+  static String? _extractImageUrl(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return value.isNotEmpty ? value : null;
+    if (value is Map) {
+      // Try different possible paths for image URL
+      return value['image_path'] ?? 
+             value['path'] ?? 
+             value['url'] ?? 
+             value['original_image'] ??
+             value['image_s3_url'];
+    }
+    return null;
+  }
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     debugPrint('=== ProductModel.fromJson Debug ===');
@@ -236,9 +250,9 @@ class ProductModel {
           primaryTranslation?.metaDescription),
       bodyHtml: primaryTranslation?.bodyHtml ?? json['body_html'],
       image: primaryImage ??
-          json['image']?['image_path'] ??
+          _extractImageUrl(json['image']) ??
           json['image_url'] ??
-          json['product_image'],
+          _extractImageUrl(json['product_image']),
       thumbImage: thumbImage ?? json['thumb_image_url'],
       price: productPrice,
       compareAtPrice: comparePrice,

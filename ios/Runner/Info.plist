@@ -63,5 +63,14 @@
 		<string>mailto</string>
 		<string>https</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.848426044866-opuovb62qiql01cr0cas6n8bfnra5fdn</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -34,6 +34,15 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
   
+  void setRememberMe(bool value) {
+    _rememberMe = value;
+    if (!_rememberMe) {
+      // Clear saved credentials when remember me is disabled
+      _authService.clearRememberMeCredentials();
+    }
+    notifyListeners();
+  }
+  
   void clearError() {
     _errorMessage = null;
     notifyListeners();

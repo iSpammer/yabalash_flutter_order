@@ -5,8 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../models/dashboard_section.dart';
 import '../widgets/banner_carousel.dart';
 import '../widgets/category_grid.dart';
-import '../widgets/yabalash_bags_section.dart';
-import '../widgets/surprise_bags_section.dart';
 import '../../restaurants/widgets/restaurant_card_v2.dart';
 import '../../restaurants/models/restaurant_model.dart';
 import '../../restaurants/models/product_model.dart';
@@ -23,6 +21,18 @@ import 'package:cached_network_image/cached_network_image.dart';
 class SectionWidgetFactory {
   static Widget buildSection(DashboardSection section,
       {BuildContext? context}) {
+    // Check if section has a special translated title that requires special handling
+    final sectionTitle = section.title.toLowerCase();
+    
+    // Handle special sections by their translated titles
+    if (sectionTitle.contains('yabalash bags') || sectionTitle.contains('ya balash bags')) {
+      return _buildYaBalashBagsSection(section, context: context);
+    }
+    
+    if (sectionTitle.contains('surprise bags')) {
+      return _buildSurpriseBagsSection(section, context: context);
+    }
+    
     final sectionType = DashboardSectionType.fromSlug(section.slug);
     // Debug: sections to be displayed ${sectionType!.name}
     switch (sectionType) {
@@ -58,7 +68,7 @@ class SectionWidgetFactory {
         return _buildSingleCategoryProductsSection(section);
 
       case DashboardSectionType.recentlyViewed:
-        return _buildRecentlyViewedSection(section);
+        return _buildRecentlyViewedSection(section, context: context);
 
       case DashboardSectionType.longTermService:
         return _buildLongTermServiceSection(section);
@@ -73,13 +83,13 @@ class SectionWidgetFactory {
         return _buildDynamicHtmlSection(section);
 
       case DashboardSectionType.yabalashBags:
-        return _buildYaBalashBagsSection(section);
+        return _buildYaBalashBagsSection(section, context: context);
 
       case DashboardSectionType.surpriseBags:
-        return _buildSurpriseBagsSection(section);
+        return _buildSurpriseBagsSection(section, context: context);
 
       default:
-        return _buildGenericSection(section);
+        return _buildGenericSection(section, context: context);
     }
   }
 
@@ -183,7 +193,7 @@ class SectionWidgetFactory {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(height: 24.h),
-        _buildSectionHeaderWithViewAll(section),
+        _buildSectionHeaderWithViewAll(section, context: context),
         SizedBox(height: 12.h),
         SizedBox(
           height: 280.h,
@@ -207,6 +217,12 @@ class SectionWidgetFactory {
 
   static Widget _buildProductCard(
       ProductModel product, String sectionType, BuildContext? context) {
+    // Calculate discount percentage if compare price exists
+    final hasDiscount = product.compareAtPrice != null && product.compareAtPrice! > product.price;
+    final discountPercentage = hasDiscount 
+        ? ((product.compareAtPrice! - product.price) / product.compareAtPrice! * 100).round()
+        : 0;
+    
     return GestureDetector(
       onTap: () {
         if (context != null) {
@@ -216,70 +232,266 @@ class SectionWidgetFactory {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16.r),
+          borderRadius: BorderRadius.circular(24.r),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
+              spreadRadius: -8,
             ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Enhanced image section
             Stack(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16.r),
-                    topRight: Radius.circular(16.r),
+                Hero(
+                  tag: 'dashboard-product-${product.id}-${sectionType}',
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(24.r),
+                      topRight: Radius.circular(24.r),
+                    ),
+                    child: Container(
+                      height: 140.h,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.grey[100]!,
+                            Colors.grey[50]!,
+                          ],
+                        ),
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _buildProductImage(product),
+                          // Subtle gradient overlay
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withOpacity(0.05),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: _buildProductImage(product),
                 ),
-                _buildProductBadge(sectionType),
+                // Enhanced product badge
+                Positioned(
+                  top: 10.h,
+                  left: 10.w,
+                  child: _buildEnhancedProductBadge(sectionType),
+                ),
+                // Enhanced discount badge
+                if (hasDiscount)
+                  Positioned(
+                    top: 10.h,
+                    right: 10.w,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.red[500]!, Colors.red[700]!],
+                        ),
+                        borderRadius: BorderRadius.circular(16.r),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withOpacity(0.4),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.local_offer_rounded,
+                            size: 12.sp,
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: 3.w),
+                          Text(
+                            '$discountPercentage% OFF',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11.sp,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                // Enhanced wishlist button
+                Positioned(
+                  bottom: 10.h,
+                  right: 10.w,
+                  child: Container(
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.favorite_outline_rounded,
+                      size: 20.sp,
+                      color: Colors.pink[400],
+                    ),
+                  ),
+                ),
               ],
             ),
-            Padding(
-              padding: EdgeInsets.all(12.w),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (product.description != null) ...[
-                    SizedBox(height: 4.h),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.all(12.w),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Enhanced vendor and product info
+                    if (product.vendor?.name != null) ...[
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                        decoration: BoxDecoration(
+                          color: _getSectionColor(sectionType).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                        child: Text(
+                          product.vendor!.name,
+                          style: TextStyle(
+                            fontSize: 10.sp,
+                            color: _getSectionColor(sectionType),
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      SizedBox(height: 6.h),
+                    ],
+                    // Enhanced product name
                     Text(
-                      product.description!,
+                      product.name,
                       style: TextStyle(
-                        fontSize: 12.sp,
-                        color: Colors.grey[600],
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                        height: 1.2,
+                        letterSpacing: -0.3,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                  SizedBox(height: 8.h),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'AED ${product.price.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w700,
-                          color: _getSectionColor(sectionType),
+                    // Enhanced rating display
+                    if (product.rating != null && product.rating! > 0) ...[
+                      SizedBox(height: 6.h),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                        decoration: BoxDecoration(
+                          color: Colors.amber[50],
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ...List.generate(
+                              5,
+                              (index) => Icon(
+                                index < product.rating!.floor()
+                                    ? Icons.star_rounded
+                                    : index < product.rating!.ceil()
+                                        ? Icons.star_half_rounded
+                                        : Icons.star_outline_rounded,
+                                size: 12.sp,
+                                color: Colors.amber[700],
+                              ),
+                            ),
+                            SizedBox(width: 4.w),
+                            Text(
+                              product.rating!.toStringAsFixed(1),
+                              style: TextStyle(
+                                fontSize: 11.sp,
+                                color: Colors.amber[800],
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Consumer<CartProvider>(
+                    ],
+                    const Spacer(),
+                    // Enhanced price display
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (hasDiscount) ...[
+                          Row(
+                            children: [
+                              Text(
+                                'AED ${product.compareAtPrice!.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  fontSize: 12.sp,
+                                  color: Colors.grey[500],
+                                  decoration: TextDecoration.lineThrough,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(width: 6.w),
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                decoration: BoxDecoration(
+                                  color: Colors.red[50],
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                child: Text(
+                                  'Save AED ${(product.compareAtPrice! - product.price).toStringAsFixed(0)}',
+                                  style: TextStyle(
+                                    fontSize: 10.sp,
+                                    color: Colors.red[700],
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 2.h),
+                        ],
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              'AED ${product.price.toStringAsFixed(0)}',
+                              style: TextStyle(
+                                fontSize: 18.sp,
+                                fontWeight: FontWeight.w800,
+                                color: hasDiscount ? Colors.red[600] : Colors.black87,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            Consumer<CartProvider>(
                         builder: (context, cartProvider, child) {
                           final quantity =
                               cartProvider.getQuantityForProduct(product);
@@ -359,7 +571,7 @@ class SectionWidgetFactory {
                                     ),
                                   ),
                                   GestureDetector(
-                                    onTap: () => _handleAddToCart(
+                                    onTap: () => handleAddToCart(
                                         product, context, cartProvider),
                                     child: Container(
                                       padding: EdgeInsets.all(4.w),
@@ -376,7 +588,7 @@ class SectionWidgetFactory {
                           } else {
                             // Show add button
                             return GestureDetector(
-                              onTap: () => _handleAddToCart(
+                              onTap: () => handleAddToCart(
                                   product, context, cartProvider),
                               child: Container(
                                 padding: EdgeInsets.symmetric(
@@ -395,13 +607,103 @@ class SectionWidgetFactory {
                           }
                         },
                       ),
-                    ],
-                  ),
-                ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  static Widget _buildEnhancedProductBadge(String sectionType) {
+    String badgeText;
+    Color gradientStart;
+    Color gradientEnd;
+    IconData badgeIcon;
+
+    switch (sectionType) {
+      case 'new_products':
+        badgeText = 'NEW';
+        gradientStart = Colors.green[500]!;
+        gradientEnd = Colors.green[700]!;
+        badgeIcon = Icons.fiber_new_rounded;
+        break;
+      case 'featured_products':
+        badgeText = 'FEATURED';
+        gradientStart = Colors.blue[500]!;
+        gradientEnd = Colors.blue[700]!;
+        badgeIcon = Icons.auto_awesome_rounded;
+        break;
+      case 'on_sale':
+        badgeText = 'SALE';
+        gradientStart = Colors.red[500]!;
+        gradientEnd = Colors.red[700]!;
+        badgeIcon = Icons.local_offer_rounded;
+        break;
+      case 'best_sellers':
+        badgeText = 'HOT';
+        gradientStart = Colors.orange[500]!;
+        gradientEnd = Colors.deepOrange[700]!;
+        badgeIcon = Icons.whatshot_rounded;
+        break;
+      case 'yabalash_bags':
+        badgeText = 'YABALASH';
+        gradientStart = Colors.purple[500]!;
+        gradientEnd = Colors.purple[700]!;
+        badgeIcon = Icons.shopping_bag_rounded;
+        break;
+      case 'surprise_bags':
+        badgeText = 'SURPRISE';
+        gradientStart = Colors.pink[400]!;
+        gradientEnd = Colors.orange[600]!;
+        badgeIcon = Icons.card_giftcard_rounded;
+        break;
+      default:
+        return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [gradientStart, gradientEnd],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: gradientStart.withOpacity(0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            badgeIcon,
+            color: Colors.white,
+            size: 14.sp,
+          ),
+          SizedBox(width: 4.w),
+          Text(
+            badgeText,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -425,6 +727,14 @@ class SectionWidgetFactory {
         break;
       case 'best_sellers':
         badgeText = 'BESTSELLER';
+        badgeColor = Colors.orange[600]!;
+        break;
+      case 'yabalash_bags':
+        badgeText = 'YABALASH';
+        badgeColor = Colors.purple[600]!;
+        break;
+      case 'surprise_bags':
+        badgeText = 'SURPRISE';
         badgeColor = Colors.orange[600]!;
         break;
       default:
@@ -461,6 +771,10 @@ class SectionWidgetFactory {
       case 'on_sale':
         return Colors.red[600]!;
       case 'best_sellers':
+        return Colors.orange[600]!;
+      case 'yabalash_bags':
+        return Colors.purple[600]!;
+      case 'surprise_bags':
         return Colors.orange[600]!;
       default:
         return Colors.purple[600]!;
@@ -662,8 +976,8 @@ class SectionWidgetFactory {
     return _buildProductsSection(section, null);
   }
 
-  static Widget _buildRecentlyViewedSection(DashboardSection section) {
-    return _buildProductsSection(section, null);
+  static Widget _buildRecentlyViewedSection(DashboardSection section, {BuildContext? context}) {
+    return _buildProductsSection(section, context);
   }
 
   static Widget _buildLongTermServiceSection(DashboardSection section) {
@@ -735,25 +1049,156 @@ class SectionWidgetFactory {
     );
   }
 
-  static Widget _buildGenericSection(DashboardSection section) {
-    if (section.data.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: EdgeInsets.all(16.w),
+  static Widget _buildGenericSection(DashboardSection section, {BuildContext? context}) {
+    // Always show sections even if empty, with a beautiful placeholder
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 24.h),
+        _buildSectionHeaderWithViewAll(section, context: context),
+        SizedBox(height: 12.h),
+        
+        if (section.data.isEmpty) 
+          _buildEmptyStateWidget(section)
+        else
+          _buildGenericContentGrid(section),
+      ],
+    );
+  }
+  
+  static Widget _buildEmptyStateWidget(DashboardSection section) {
+    // Get appropriate icon and message based on section type
+    IconData icon;
+    String message;
+    Color accentColor;
+    
+    switch (section.slug) {
+      case 'best_sellers':
+        icon = Icons.trending_up_rounded;
+        message = 'Best selling items will appear here soon';
+        accentColor = Colors.orange[600]!;
+        break;
+      case 'cities':
+        icon = Icons.location_city_rounded;
+        message = 'Available cities will be shown here';
+        accentColor = Colors.blue[600]!;
+        break;
+      case 'recent_orders':
+        icon = Icons.receipt_long_rounded;
+        message = 'Your recent orders will appear here';
+        accentColor = Colors.green[600]!;
+        break;
+      case 'spotlight_deals':
+        icon = Icons.local_offer_rounded;
+        message = 'Amazing deals coming soon!';
+        accentColor = Colors.red[600]!;
+        break;
+      case 'trending_vendors':
+        icon = Icons.trending_up_rounded;
+        message = 'Popular restaurants will be featured here';
+        accentColor = Colors.purple[600]!;
+        break;
+      case 'most_popular_products':
+        icon = Icons.star_rounded;
+        message = 'Popular items will be shown here';
+        accentColor = Colors.amber[600]!;
+        break;
+      case 'long_term_service':
+        icon = Icons.schedule_rounded;
+        message = 'Long term services coming soon';
+        accentColor = Colors.indigo[600]!;
+        break;
+      default:
+        icon = Icons.access_time_rounded;
+        message = 'Content coming soon';
+        accentColor = Colors.grey[600]!;
+    }
+    
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w),
+      padding: EdgeInsets.all(24.w),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accentColor.withOpacity(0.05),
+            accentColor.withOpacity(0.02),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(
+          color: accentColor.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader(section.getLocalizedTitle()),
-          SizedBox(height: 8.h),
+          Container(
+            padding: EdgeInsets.all(16.w),
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 32.sp,
+              color: accentColor,
+            ),
+          ),
+          SizedBox(height: 12.h),
           Text(
-            'Section: ${section.slug} (${section.data.length} items)',
+            message,
             style: TextStyle(
               fontSize: 14.sp,
-              color: Colors.grey[600],
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
+    );
+  }
+  
+  static Widget _buildGenericContentGrid(DashboardSection section) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12.w,
+        mainAxisSpacing: 12.h,
+        childAspectRatio: 1.2,
+      ),
+      itemCount: section.data.length > 4 ? 4 : section.data.length,
+      itemBuilder: (context, index) {
+        final item = section.data[index];
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              item['name'] ?? item['title'] ?? 'Item ${index + 1}',
+              style: TextStyle(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -771,7 +1216,7 @@ class SectionWidgetFactory {
     );
   }
 
-  static Widget _buildSectionHeaderWithViewAll(DashboardSection section) {
+  static Widget _buildSectionHeaderWithViewAll(DashboardSection section, {BuildContext? context}) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w),
       child: Row(
@@ -788,12 +1233,22 @@ class SectionWidgetFactory {
           TextButton(
             onPressed: () {
               // Navigate to see all
+              if (context != null) {
+                context.push(
+                  '/section-all',
+                  extra: {
+                    'section': section,
+                    'sectionType': section.slug,
+                  },
+                );
+              }
             },
             child: Text(
               'See All',
               style: TextStyle(
                 fontSize: 14.sp,
                 fontWeight: FontWeight.w600,
+                color: _getSectionColor(section.slug),
               ),
             ),
           ),
@@ -802,7 +1257,7 @@ class SectionWidgetFactory {
     );
   }
 
-  static void _handleAddToCart(
+  static void handleAddToCart(
       ProductModel product, BuildContext context, CartProvider cartProvider) async {
     // Check if product is in stock
     if (!product.isInStock) {
@@ -1345,7 +1800,7 @@ class SectionWidgetFactory {
     );
   }
 
-  static Widget _buildYaBalashBagsSection(DashboardSection section) {
+  static Widget _buildYaBalashBagsSection(DashboardSection section, {BuildContext? context}) {
     if (section.data.isEmpty) return const SizedBox.shrink();
 
     // Convert section data to ProductModel list
@@ -1353,18 +1808,64 @@ class SectionWidgetFactory {
         .map((productJson) => ProductModel.fromJson(productJson))
         .toList();
 
-    return YaBalashBagsSection(products: products);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 24.h),
+        _buildSectionHeaderWithViewAll(section, context: context),
+        SizedBox(height: 12.h),
+        SizedBox(
+          height: 280.h,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: 12.w),
+            itemCount: products.length,
+            itemBuilder: (context, index) {
+              final product = products[index];
+              return Container(
+                width: 200.w,
+                margin: EdgeInsets.symmetric(horizontal: 4.w),
+                child: _buildProductCard(product, 'yabalash_bags', context),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 
-  static Widget _buildSurpriseBagsSection(DashboardSection section) {
+  static Widget _buildSurpriseBagsSection(DashboardSection section, {BuildContext? context}) {
     if (section.data.isEmpty) return const SizedBox.shrink();
 
     // Convert section data to ProductModel list
     final products = section.data
         .map((productJson) => ProductModel.fromJson(productJson))
         .toList();
-    debugPrint("el product is $products");
-    return SurpriseBagsSection(products: products);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 24.h),
+        _buildSectionHeaderWithViewAll(section, context: context),
+        SizedBox(height: 12.h),
+        SizedBox(
+          height: 280.h,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: 12.w),
+            itemCount: products.length,
+            itemBuilder: (context, index) {
+              final product = products[index];
+              return Container(
+                width: 200.w,
+                margin: EdgeInsets.symmetric(horizontal: 4.w),
+                child: _buildProductCard(product, 'surprise_bags', context),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 
   static Widget _buildProductImage(ProductModel product) {

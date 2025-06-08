@@ -191,27 +191,41 @@ class RestaurantModel {
   }
   
   factory RestaurantModel.fromJson(Map<String, dynamic> json) {
+    // Handle nested data structure from API
+    Map<String, dynamic> vendorData = json;
+    if (json['vendor'] != null && json['vendor'] is Map) {
+      vendorData = json['vendor'] as Map<String, dynamic>;
+    }
+    
     // Handle nested image object from V2 API
     String? imageUrl;
     
     // Try logo first (for vendor listings), then image
-    if (json['logo'] != null) {
-      if (json['logo'] is Map<String, dynamic>) {
+    if (vendorData['logo'] != null) {
+      if (vendorData['logo'] is Map<String, dynamic>) {
         // New format: logo is an object with image_s3_url
-        final logoData = json['logo'] as Map<String, dynamic>;
+        final logoData = vendorData['logo'] as Map<String, dynamic>;
         imageUrl = logoData['image_s3_url'] ?? logoData['proxy_url'];
       } else {
         // Old format: logo is a string
+        imageUrl = ImageUtils.buildVendorLogoUrl(vendorData['logo']);
+      }
+    } else if (vendorData['image'] != null) {
+      imageUrl = ImageUtils.buildImageUrl(vendorData['image']);
+    } else if (json['logo'] != null) {
+      // Fallback to original json
+      if (json['logo'] is Map<String, dynamic>) {
+        final logoData = json['logo'] as Map<String, dynamic>;
+        imageUrl = logoData['image_s3_url'] ?? logoData['proxy_url'];
+      } else {
         imageUrl = ImageUtils.buildVendorLogoUrl(json['logo']);
       }
-    } else if (json['image'] != null) {
-      imageUrl = ImageUtils.buildImageUrl(json['image']);
     }
     
     // Handle nested name from translation
-    String? vendorName = json['name'];
-    if (vendorName == null && json['translation'] is List) {
-      final translations = json['translation'] as List;
+    String? vendorName = vendorData['name'];
+    if (vendorName == null && vendorData['translation'] is List) {
+      final translations = vendorData['translation'] as List;
       if (translations.isNotEmpty && translations[0] is Map) {
         vendorName = translations[0]['name'];
       }
@@ -221,81 +235,81 @@ class RestaurantModel {
     String? deliveryTimeStr;
     double? deliveryFeeAmount;
     
-    if (json['delivery_time'] != null) {
-      deliveryTimeStr = json['delivery_time'].toString();
-    } else if (json['deliveryTime'] != null) {
-      deliveryTimeStr = '${json['deliveryTime']} min';
-    } else if (json['timeofLineOfSightDistance'] != null) {
-      deliveryTimeStr = json['timeofLineOfSightDistance'].toString();
-    } else if (json['avg_delivery_time'] != null) {
-      deliveryTimeStr = '${json['avg_delivery_time']} min';
+    if (vendorData['delivery_time'] != null) {
+      deliveryTimeStr = vendorData['delivery_time'].toString();
+    } else if (vendorData['deliveryTime'] != null) {
+      deliveryTimeStr = '${vendorData['deliveryTime']} min';
+    } else if (vendorData['timeofLineOfSightDistance'] != null) {
+      deliveryTimeStr = vendorData['timeofLineOfSightDistance'].toString();
+    } else if (vendorData['avg_delivery_time'] != null) {
+      deliveryTimeStr = '${vendorData['avg_delivery_time']} min';
     }
     
-    if (json['delivery_fee'] != null) {
+    if (vendorData['delivery_fee'] != null) {
       try {
-        deliveryFeeAmount = double.parse(json['delivery_fee'].toString());
+        deliveryFeeAmount = double.parse(vendorData['delivery_fee'].toString());
       } catch (e) {
         deliveryFeeAmount = null;
       }
-    } else if (json['delivery_charges'] != null) {
+    } else if (vendorData['delivery_charges'] != null) {
       try {
-        deliveryFeeAmount = double.parse(json['delivery_charges'].toString());
+        deliveryFeeAmount = double.parse(vendorData['delivery_charges'].toString());
       } catch (e) {
         deliveryFeeAmount = null;
       }
     }
     
     return RestaurantModel(
-      id: json['id'],
-      name: vendorName,
-      description: HtmlUtils.safeExtractText(json['description'] ?? json['desc']),
+      id: vendorData['id'] ?? json['id'],
+      name: vendorName ?? json['vendor_name'] ?? 'Restaurant',
+      description: HtmlUtils.safeExtractText(vendorData['description'] ?? vendorData['desc'] ?? vendorData['short_desc'] ?? json['description'] ?? json['desc']),
       image: imageUrl,
-      images: json['images'] != null ? List<String>.from(json['images']) : null,
-      rating: _parseDouble(json['rating'] ?? json['vendorRating'] ?? json['avg_rating']),
-      reviewCount: _parseInt(json['review_count'] ?? json['reviews_count'] ?? json['selling_count']),
-      address: json['address'],
-      latitude: _parseDouble(json['latitude']),
-      longitude: _parseDouble(json['longitude']),
-      distance: _parseDistanceFromString(json['lineOfSightDistance']) ?? _parseDouble(json['distance']),
+      images: vendorData['images'] != null ? List<String>.from(vendorData['images']) : null,
+      rating: _parseDouble(vendorData['rating'] ?? vendorData['vendorRating'] ?? vendorData['avg_rating']),
+      reviewCount: _parseInt(vendorData['review_count'] ?? vendorData['reviews_count'] ?? vendorData['selling_count']),
+      address: vendorData['address'],
+      latitude: _parseDouble(vendorData['latitude']),
+      longitude: _parseDouble(vendorData['longitude']),
+      distance: _parseDistanceFromString(vendorData['lineOfSightDistance']) ?? _parseDouble(vendorData['distance']),
       deliveryTime: deliveryTimeStr,
       deliveryFee: deliveryFeeAmount,
-      timeofLineOfSightDistance: _parseInt(json['timeofLineOfSightDistance'] ?? json['deliveryTime'] ?? json['order_pre_time']),
-      timeofLineOfSightDistanceStr: json['timeofLineOfSightDistance']?.toString(),
-      minimumOrderAmount: _parseDouble(json['minimum_order_amount'] ?? json['min_order_value'] ?? json['minimum_price']),
-      isOpen: _determineIsOpen(json),
-      isDeliveryAvailable: json['is_delivery_available'] == 1 || json['is_delivery_available'] == true,
-      isPickupAvailable: json['is_pickup_available'] == 1 || json['is_pickup_available'] == true,
-      phoneNumber: json['phone_number'] ?? json['phone'],
-      email: json['email'],
-      cuisines: _extractCuisinesList(json),
-      businessHours: json['business_hours'],
-      isFeatured: json['is_featured'] == 1 || json['is_featured'] == true,
-      isPureVeg: json['is_pure_veg'] == 1 || json['is_pure_veg'] == true,
-      priceRange: json['price_range'],
-      logo: _extractImageUrl(json['logo']),
-      banner: _extractBannerUrl(json['banner']),
-      isFavorite: json['is_wishlist'] == 1 || json['is_favorite'] == 1,
-      tags: json['tags'] != null ? List<String>.from(json['tags']) : null,
-      minimumOrder: _parseDouble(json['minimum_order_amount'] ?? json['min_order_value'] ?? json['minimum_price']),
-      products: _extractProductsList(json['products']),
-      categories: _extractCategoriesList(json['categories']),
-      slug: json['slug'],
-      showSlot: _parseInt(json['show_slot']),
-      adminRating: _parseDouble(json['admin_rating']),
-      closedStoreOrderScheduled: _parseInt(json['closed_store_order_scheduled']),
-      isWishlist: json['is_wishlist'] == 1 || json['is_wishlist'] == true,
-      promoDiscount: json['promo_discount']?.toString(),
-      categoriesList: json['categoriesList'] ?? json['type_title'],
-      sellingCount: _parseInt(json['selling_count']),
-      slotdateStartEndTime: json['slotdate_start_end_time']?.toString(),
-      slotStartEndTime: json['slot_start_end_time']?.toString(),
-      productAvgAverageRating: _parseDouble(json['product_avg_average_rating']),
-      vendorRating: json['vendorRating']?.toString(),
-      typeTitle: json['type_title'],
-      isVendorClosed: json['is_vendor_closed'] == 1 || json['is_vendor_closed'] == true,
-      dateWithSlots: json['date_with_slots'] is List ? json['date_with_slots'] : null,
-      delaySlot: _parseInt(json['delaySlot']),
-      deliveryTime8: json['delivery_time']?.toString(),
+      timeofLineOfSightDistance: _parseInt(vendorData['timeofLineOfSightDistance'] ?? vendorData['deliveryTime'] ?? vendorData['order_pre_time']),
+      timeofLineOfSightDistanceStr: vendorData['timeofLineOfSightDistance']?.toString(),
+      minimumOrderAmount: _parseDouble(vendorData['minimum_order_amount'] ?? vendorData['min_order_value'] ?? vendorData['minimum_price'] ?? vendorData['order_min_amount']),
+      isOpen: _determineIsOpen(vendorData),
+      isDeliveryAvailable: vendorData['delivery'] == 1 || vendorData['delivery'] == true || vendorData['is_delivery_available'] == 1 || vendorData['is_delivery_available'] == true,
+      isPickupAvailable: vendorData['takeaway'] == 1 || vendorData['takeaway'] == true || vendorData['is_pickup_available'] == 1 || vendorData['is_pickup_available'] == true,
+      phoneNumber: vendorData['phone_no'] ?? vendorData['phone_number'] ?? vendorData['phone'],
+      email: vendorData['email'],
+      cuisines: _extractCuisinesList(vendorData),
+      businessHours: vendorData['business_hours'],
+      isFeatured: vendorData['is_featured'] == 1 || vendorData['is_featured'] == true,
+      isPureVeg: vendorData['is_pure_veg'] == 1 || vendorData['is_pure_veg'] == true,
+      priceRange: vendorData['price_range'],
+      logo: _extractImageUrl(vendorData['logo']),
+      banner: _extractBannerUrl(vendorData['banner']),
+      isFavorite: vendorData['is_wishlist'] == 1 || vendorData['is_favorite'] == 1,
+      tags: vendorData['tags'] != null ? List<String>.from(vendorData['tags']) : null,
+      minimumOrder: _parseDouble(vendorData['minimum_order_amount'] ?? vendorData['min_order_value'] ?? vendorData['minimum_price'] ?? vendorData['order_min_amount']),
+      products: _extractProductsList(json['products'] ?? vendorData['products']),
+      categories: _extractCategoriesList(json['categories'] ?? vendorData['categories']),
+      slug: vendorData['slug'],
+      showSlot: _parseInt(vendorData['show_slot']),
+      adminRating: _parseDouble(vendorData['admin_rating']),
+      closedStoreOrderScheduled: _parseInt(vendorData['closed_store_order_scheduled']),
+      isWishlist: vendorData['is_wishlist'] == 1 || vendorData['is_wishlist'] == true,
+      promoDiscount: vendorData['promo_discount']?.toString(),
+      categoriesList: vendorData['categoriesList'] ?? vendorData['type_title'],
+      sellingCount: _parseInt(vendorData['selling_count']),
+      slotdateStartEndTime: vendorData['slotdate_start_end_time']?.toString(),
+      slotStartEndTime: vendorData['slot_start_end_time']?.toString(),
+      productAvgAverageRating: _parseDouble(vendorData['product_avg_average_rating']),
+      vendorRating: vendorData['vendorRating']?.toString(),
+      typeTitle: vendorData['type_title'],
+      isVendorClosed: vendorData['is_vendor_closed'] == 1 || vendorData['is_vendor_closed'] == true,
+      dateWithSlots: vendorData['date_with_slots'] is List ? vendorData['date_with_slots'] : null,
+      delaySlot: _parseInt(vendorData['delaySlot']),
+      deliveryTime8: vendorData['delivery_time']?.toString(),
     );
   }
 
