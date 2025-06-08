@@ -13,6 +13,7 @@ import '../models/payment_method_model.dart';
 import '../widgets/payment_method_card.dart';
 import '../widgets/order_summary_widget.dart';
 import '../widgets/card_input_widget.dart';
+import '../../dashboard/widgets/delivery_pickup_toggle.dart';
 
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({Key? key}) : super(key: key);
@@ -286,8 +287,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Delivery Address
-                      _buildDeliveryAddress(addressProvider),
+                      // Delivery/Pickup Address
+                      _buildAddressSection(addressProvider, cartProvider),
                       SizedBox(height: 24.h),
 
                       // Order Summary
@@ -299,21 +300,23 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         SizedBox(height: 24.h),
                       ],
 
-                      // Delivery Instructions
-                      Text(
-                        'Delivery Instructions',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w600,
+                      // Delivery Instructions (only for delivery orders)
+                      if (cartProvider.deliveryMode == DeliveryMode.delivery) ...[
+                        Text(
+                          'Delivery Instructions',
+                          style: TextStyle(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 8.h),
-                      CustomTextField(
-                        controller: _instructionsController,
-                        hintText: 'Add delivery instructions (optional)',
-                        maxLines: 3,
-                      ),
-                      SizedBox(height: 16.h),
+                        SizedBox(height: 8.h),
+                        CustomTextField(
+                          controller: _instructionsController,
+                          hintText: 'Add delivery instructions (optional)',
+                          maxLines: 3,
+                        ),
+                        SizedBox(height: 16.h),
+                      ],
 
                       // Order Note
                       Text(
@@ -382,48 +385,114 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Widget _buildDeliveryAddress(AddressProvider addressProvider) {
-    final address = addressProvider.selectedAddress;
+  Widget _buildAddressSection(AddressProvider addressProvider, CartProvider cartProvider) {
+    final isPickup = cartProvider.deliveryMode == DeliveryMode.pickup;
     
-    return Container(
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(12.r),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.location_on,
-            color: Theme.of(context).primaryColor,
-            size: 24.sp,
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Delivery Address',
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  address?.fullAddress ?? 'No address selected',
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+    if (isPickup) {
+      // For pickup orders, show vendor address
+      final vendorAddress = _getVendorAddress(cartProvider);
+      
+      return Container(
+        padding: EdgeInsets.all(16.w),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(12.r),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.store,
+              color: Theme.of(context).primaryColor,
+              size: 24.sp,
             ),
-          ),
-        ],
-      ),
-    );
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Pickup Location',
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    vendorAddress ?? 'Vendor location',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // For delivery orders, show user's address
+      final address = addressProvider.selectedAddress;
+      
+      return Container(
+        padding: EdgeInsets.all(16.w),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(12.r),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.location_on,
+              color: Theme.of(context).primaryColor,
+              size: 24.sp,
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Delivery Address',
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    address?.fullAddress ?? 'No address selected',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+  
+  String? _getVendorAddress(CartProvider cartProvider) {
+    // Get vendor address from cart data
+    if (cartProvider.cartData?.products.isNotEmpty == true) {
+      final vendorData = cartProvider.cartData!.products.first;
+      final vendor = vendorData.vendor;
+      
+      if (vendor != null) {
+        // Return vendor name and address
+        if (vendor.address != null) {
+          return '${vendor.name ?? 'Store'}\n${vendor.address}';
+        } else {
+          return vendor.name ?? 'Store location';
+        }
+      }
+    }
+    return 'Store location';
   }
 
   Widget _buildPlaceOrderButton(PaymentProvider paymentProvider, CartProvider cartProvider) {

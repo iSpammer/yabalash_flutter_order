@@ -1865,8 +1865,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
           
           SizedBox(height: 16.h),
           
-          // Delivery Address
-          if (order.address != null) _buildDeliveryAddress(order.address!),
+          // Delivery/Pickup Address
+          _buildAddressSection(order),
           
           SizedBox(height: 16.h),
           
@@ -1878,71 +1878,163 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
     );
   }
 
-  Widget _buildDeliveryAddress(OrderAddressModel address) {
-    return Container(
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.location_on,
-                size: 20.sp,
-                color: Colors.red,
+  Widget _buildAddressSection(OrderModel order) {
+    final isPickup = order.luxuryOptionName?.toLowerCase() == 'pickup' || 
+                     order.luxuryOptionName?.toLowerCase() == 'takeaway';
+    
+    if (isPickup) {
+      // For pickup orders, show vendor address
+      if (order.vendors?.isNotEmpty != true) return const SizedBox.shrink();
+      
+      final vendor = order.vendors!.first;
+      
+      return Container(
+        padding: EdgeInsets.all(16.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16.r),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.store,
+                  size: 20.sp,
+                  color: Colors.blue,
+                ),
+                SizedBox(width: 8.w),
+                Text(
+                  'Pickup Location',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12.h),
+            Text(
+              vendor.vendorName ?? 'Restaurant',
+              style: TextStyle(
+                fontSize: 15.sp,
+                color: Colors.black87,
+                fontWeight: FontWeight.w600,
               ),
-              SizedBox(width: 8.w),
+            ),
+            if (vendor.vendor?.address != null) ...[
+              SizedBox(height: 4.h),
               Text(
-                'Delivery Address',
+                vendor.vendor!.address!,
                 style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  fontSize: 14.sp,
+                  color: Colors.grey[700],
                 ),
               ),
             ],
-          ),
-          SizedBox(height: 12.h),
-          Text(
-            address.address,
-            style: TextStyle(
-              fontSize: 14.sp,
-              color: Colors.black87,
-              fontWeight: FontWeight.w500,
+            if (vendor.vendor?.phone != null) ...[
+              SizedBox(height: 8.h),
+              Row(
+                children: [
+                  Icon(
+                    Icons.phone,
+                    size: 16.sp,
+                    color: Colors.grey[600],
+                  ),
+                  SizedBox(width: 4.w),
+                  Text(
+                    vendor.vendor!.phone!,
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      );
+    } else {
+      // For delivery orders, show user's delivery address
+      if (order.address == null) return const SizedBox.shrink();
+      
+      final address = order.address!;
+      
+      return Container(
+        padding: EdgeInsets.all(16.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16.r),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
-          ),
-          if (address.houseNumber != null && address.houseNumber!.isNotEmpty) ...[
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.location_on,
+                  size: 20.sp,
+                  color: Colors.red,
+                ),
+                SizedBox(width: 8.w),
+                Text(
+                  'Delivery Address',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12.h),
+            Text(
+              address.address,
+              style: TextStyle(
+                fontSize: 14.sp,
+                color: Colors.black87,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            if (address.houseNumber != null && address.houseNumber!.isNotEmpty) ...[
+              SizedBox(height: 4.h),
+              Text(
+                'House/Apt: ${address.houseNumber}',
+                style: TextStyle(
+                  fontSize: 13.sp,
+                  color: Colors.grey[700],
+                ),
+              ),
+            ],
             SizedBox(height: 4.h),
             Text(
-              'House/Apt: ${address.houseNumber}',
+              '${address.city ?? ''}, ${address.state ?? ''} ${address.zipCode ?? address.pincode ?? ''}',
               style: TextStyle(
                 fontSize: 13.sp,
                 color: Colors.grey[700],
               ),
             ),
           ],
-          SizedBox(height: 4.h),
-          Text(
-            '${address.city ?? ''}, ${address.state ?? ''} ${address.zipCode ?? address.pincode ?? ''}',
-            style: TextStyle(
-              fontSize: 13.sp,
-              color: Colors.grey[700],
-            ),
-          ),
-        ],
-      ),
-    );
+        ),
+      );
+    }
   }
 
   Widget _buildSpecialInstructions(OrderModel order) {
@@ -1993,7 +2085,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Delivery Instructions',
+                    order.luxuryOptionName?.toLowerCase() == 'pickup' || 
+                    order.luxuryOptionName?.toLowerCase() == 'takeaway' 
+                        ? 'Pickup Instructions' 
+                        : 'Delivery Instructions',
                     style: TextStyle(
                       fontSize: 12.sp,
                       fontWeight: FontWeight.w600,

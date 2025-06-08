@@ -5,6 +5,7 @@ import '../models/place_order_model.dart';
 import '../services/payment_service.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../../profile/providers/address_provider.dart';
+import '../../dashboard/widgets/delivery_pickup_toggle.dart';
 
 class PaymentProvider extends ChangeNotifier {
   final PaymentService _paymentService = PaymentService();
@@ -125,7 +126,9 @@ class PaymentProvider extends ChangeNotifier {
       return null;
     }
 
-    if (addressProvider.selectedAddress == null) {
+    // Only require address for delivery orders
+    if (cartProvider.deliveryMode == DeliveryMode.delivery && 
+        addressProvider.selectedAddress == null) {
       _errorMessage = 'Please select a delivery address';
       notifyListeners();
       return null;
@@ -136,8 +139,13 @@ class PaymentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // For pickup orders, use a default address ID (0 or vendor's address ID)
+      final addressId = cartProvider.deliveryMode == DeliveryMode.delivery
+          ? (addressProvider.selectedAddress?.numericId ?? 0)
+          : 0; // Use 0 for pickup orders
+      
       final request = PlaceOrderRequest(
-        selectedAddressId: addressProvider.selectedAddress!.numericId ?? 0,
+        selectedAddressId: addressId,
         paymentOptionId: _selectedPaymentMethod!.id,
         paymentOptionCode: _selectedPaymentMethod!.code,
         tip: cartProvider.tipAmount,
@@ -151,6 +159,7 @@ class PaymentProvider extends ChangeNotifier {
         expiryYear: _expiryYear,
         cvv: _cvv,
         transactionId: transactionId,
+        orderType: cartProvider.deliveryMode == DeliveryMode.delivery ? 'delivery' : 'pickup',
       );
 
       final response = await _paymentService.placeOrder(

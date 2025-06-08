@@ -76,7 +76,7 @@ class OrderSummaryCard extends StatelessWidget {
           _buildInfoRow(
             'Order Type',
             order.luxuryOptionName ?? 'Delivery',
-            Icons.local_shipping,
+            _getOrderTypeIcon(order.luxuryOptionName),
             Colors.purple,
           ),
           
@@ -208,6 +208,17 @@ class OrderSummaryCard extends StatelessWidget {
         return 'Online Payment';
       default:
         return paymentOption.title;
+    }
+  }
+  
+  IconData _getOrderTypeIcon(String? orderType) {
+    final type = orderType?.toLowerCase() ?? 'delivery';
+    if (type == 'pickup' || type == 'takeaway') {
+      return Icons.store;
+    } else if (type == 'dine-in' || type == 'dinein') {
+      return Icons.restaurant;
+    } else {
+      return Icons.local_shipping;
     }
   }
 }

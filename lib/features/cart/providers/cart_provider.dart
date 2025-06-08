@@ -37,9 +37,20 @@ class CartProvider extends ChangeNotifier {
   double? get tipAmount => _tipAmount;
   String get scheduleType => _scheduleType;
   DateTime? get scheduledDateTime => _scheduledDateTime;
+  DeliveryMode get deliveryMode => _deliveryMode;
   
   // Check if cart has items
   bool get hasItems => _itemCount > 0;
+  
+  // Set delivery mode
+  void setDeliveryMode(DeliveryMode mode) {
+    if (_deliveryMode != mode) {
+      _deliveryMode = mode;
+      notifyListeners();
+      // Reload cart with new delivery mode
+      loadCart();
+    }
+  }
   
   // Check if cart has items from a specific vendor
   bool hasItemsFromDifferentVendor(int vendorId) {
@@ -128,13 +139,15 @@ class CartProvider extends ChangeNotifier {
   }
   
   // Load cart data
-  Future<void> loadCart({String type = 'delivery'}) async {
+  Future<void> loadCart({String? type}) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
     
     try {
-      final response = await _cartService.getCartDetail(type: type);
+      final response = await _cartService.getCartDetail(
+        type: type ?? (_deliveryMode == DeliveryMode.delivery ? 'delivery' : 'pickup'),
+      );
       
       if (response.success) {
         _cartData = response.data;
@@ -170,7 +183,7 @@ class CartProvider extends ChangeNotifier {
     required int quantity,
     int? variantId,
     List<Map<String, dynamic>>? addons,
-    String type = 'delivery',
+    String? type,
     bool skipLoadCart = false, // Add flag to skip cart reload
   }) async {
     // Don't automatically clear cart here - let the UI handle vendor conflicts
@@ -250,14 +263,14 @@ class CartProvider extends ChangeNotifier {
         productId: product.id,
         productVariantId: actualVariantId, // Use the variant ID from API
         addons: addons,
-        type: type,
+        type: type ?? (_deliveryMode == DeliveryMode.delivery ? 'delivery' : 'pickup'),
       );
       
       if (response.success) {
         // Instead of trying to parse the response data directly,
         // reload the cart to get the updated data
         if (!skipLoadCart) {
-          await loadCart(type: type);
+          await loadCart(type: type ?? (_deliveryMode == DeliveryMode.delivery ? 'delivery' : 'pickup'));
         }
         _currentVendorId = product.vendorId;
         _isLoading = false;
@@ -294,7 +307,7 @@ class CartProvider extends ChangeNotifier {
   Future<bool> updateQuantity({
     required int cartProductId,
     required int quantity,
-    String type = 'delivery',
+    String? type,
   }) async {
     if (_cartData == null) return false;
     
@@ -307,7 +320,7 @@ class CartProvider extends ChangeNotifier {
         cartId: _cartData!.id!,
         cartProductId: cartProductId,
         quantity: quantity,
-        type: type,
+        type: type ?? (_deliveryMode == DeliveryMode.delivery ? 'delivery' : 'pickup'),
       );
       
       if (response.success) {
@@ -334,7 +347,7 @@ class CartProvider extends ChangeNotifier {
   // Remove item from cart
   Future<bool> removeFromCart({
     required int cartProductId,
-    String type = 'delivery',
+    String? type,
   }) async {
     if (_cartData == null) return false;
     
@@ -346,7 +359,7 @@ class CartProvider extends ChangeNotifier {
       final response = await _cartService.removeFromCart(
         cartId: _cartData!.id!,
         cartProductId: cartProductId,
-        type: type,
+        type: type ?? (_deliveryMode == DeliveryMode.delivery ? 'delivery' : 'pickup'),
       );
       
       if (response.success) {
