@@ -260,6 +260,32 @@ class AddressProvider extends ChangeNotifier {
       _setLoading(false);
     }
   }
+
+  /// Set an address as primary (for delivery validation)
+  /// This is crucial for the backend to validate delivery availability
+  Future<bool> setAddressAsPrimary(int addressId) async {
+    try {
+      // Use numeric ID to call the API
+      final response = await _addressService.setDefaultAddress(addressId.toString());
+      
+      if (response.success) {
+        // Update default address locally
+        final address = _addresses.firstWhere(
+          (addr) => addr.numericId == addressId,
+          orElse: () => throw Exception('Address not found'),
+        );
+        
+        _updateDefaultAddress(address);
+        return true;
+      } else {
+        debugPrint('Failed to set primary address: ${response.message}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Error setting primary address: $e');
+      return false;
+    }
+  }
   
   /// Select an address for current use
   void selectAddress(AddressModel address) {

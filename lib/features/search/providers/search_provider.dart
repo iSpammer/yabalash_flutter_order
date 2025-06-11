@@ -14,7 +14,15 @@ class SearchProvider extends ChangeNotifier {
   String _currentQuery = '';
   List<RestaurantModel> _restaurants = [];
   List<ProductModel> _products = [];
+  List<dynamic> _categories = [];
+  List<dynamic> _brands = [];
   String? _errorMessage;
+  
+  // Search history
+  List<String> _searchHistory = [];
+  
+  // Voice search support
+  bool _isVoiceSearching = false;
   
   // Dependency injection
   void setAddressProvider(AddressProvider addressProvider) {
@@ -45,11 +53,18 @@ class SearchProvider extends ChangeNotifier {
 
   // Getters
   bool get isLoading => _isLoading;
+  bool get isVoiceSearching => _isVoiceSearching;
   String get currentQuery => _currentQuery;
   List<RestaurantModel> get restaurants => _restaurants;
   List<ProductModel> get products => _products;
+  List<dynamic> get categories => _categories;
+  List<dynamic> get brands => _brands;
+  List<String> get searchHistory => _searchHistory;
   String? get errorMessage => _errorMessage;
-  bool get hasResults => _restaurants.isNotEmpty || _products.isNotEmpty;
+  bool get hasResults => _restaurants.isNotEmpty || _products.isNotEmpty || _categories.isNotEmpty || _brands.isNotEmpty;
+  
+  // Get total results count
+  int get totalResults => _restaurants.length + _products.length + _categories.length + _brands.length;
 
   Future<void> search(String query, {String type = 'delivery'}) async {
     if (query.trim().isEmpty) {
@@ -76,7 +91,14 @@ class SearchProvider extends ChangeNotifier {
       
       _restaurants = searchResults['restaurants'] as List<RestaurantModel>;
       _products = searchResults['products'] as List<ProductModel>;
+      _categories = searchResults['categories'] as List? ?? [];
+      _brands = searchResults['brands'] as List? ?? [];
       _errorMessage = null;
+      
+      // Add to search history if successful
+      if (hasResults) {
+        _addToSearchHistory(query);
+      }
     } catch (e) {
       _errorMessage = 'Search failed: ${e.toString()}';
       _restaurants = [];
@@ -91,9 +113,41 @@ class SearchProvider extends ChangeNotifier {
   void clearResults() {
     _restaurants = [];
     _products = [];
+    _categories = [];
+    _brands = [];
     _currentQuery = '';
     _errorMessage = null;
     _isLoading = false;
+    notifyListeners();
+  }
+  
+  // Add query to search history
+  void _addToSearchHistory(String query) {
+    final trimmedQuery = query.trim();
+    if (trimmedQuery.isNotEmpty && !_searchHistory.contains(trimmedQuery)) {
+      _searchHistory.insert(0, trimmedQuery);
+      // Keep only last 10 searches
+      if (_searchHistory.length > 10) {
+        _searchHistory = _searchHistory.take(10).toList();
+      }
+    }
+  }
+  
+  // Clear search history
+  void clearSearchHistory() {
+    _searchHistory.clear();
+    notifyListeners();
+  }
+  
+  // Remove item from search history
+  void removeFromSearchHistory(String query) {
+    _searchHistory.remove(query);
+    notifyListeners();
+  }
+  
+  // Set voice search state
+  void setVoiceSearching(bool isVoiceSearching) {
+    _isVoiceSearching = isVoiceSearching;
     notifyListeners();
   }
 
@@ -139,6 +193,126 @@ class SearchProvider extends ChangeNotifier {
       _errorMessage = 'Product search failed: ${e.toString()}';
       _products = [];
       debugPrint('Product search error: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+  
+  // Search by category ID
+  Future<void> searchByCategory(String query, int categoryId, {String type = 'delivery'}) async {
+    _isLoading = true;
+    _currentQuery = query;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final (lat, lng) = locationCoordinates;
+      
+      final searchResults = await _searchService.searchByCategory(
+        query,
+        categoryId,
+        type: type,
+        latitude: lat,
+        longitude: lng,
+      );
+      
+      _restaurants = searchResults['restaurants'] as List<RestaurantModel>;
+      _products = searchResults['products'] as List<ProductModel>;
+      _categories = [];
+      _brands = [];
+      _errorMessage = null;
+      
+      if (hasResults) {
+        _addToSearchHistory(query);
+      }
+    } catch (e) {
+      _errorMessage = 'Category search failed: ${e.toString()}';
+      _restaurants = [];
+      _products = [];
+      _categories = [];
+      _brands = [];
+      debugPrint('Category search error: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+  
+  // Search by vendor ID
+  Future<void> searchByVendor(String query, int vendorId, {String type = 'delivery'}) async {
+    _isLoading = true;
+    _currentQuery = query;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final (lat, lng) = locationCoordinates;
+      
+      final products = await _searchService.searchByVendor(
+        query,
+        vendorId,
+        type: type,
+        latitude: lat,
+        longitude: lng,
+      );
+      
+      _restaurants = [];
+      _products = products;
+      _categories = [];
+      _brands = [];
+      _errorMessage = null;
+      
+      if (hasResults) {
+        _addToSearchHistory(query);
+      }
+    } catch (e) {
+      _errorMessage = 'Vendor search failed: ${e.toString()}';
+      _restaurants = [];
+      _products = [];
+      _categories = [];
+      _brands = [];
+      debugPrint('Vendor search error: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+  
+  // Search by brand ID
+  Future<void> searchByBrand(String query, int brandId, {String type = 'delivery'}) async {
+    _isLoading = true;
+    _currentQuery = query;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final (lat, lng) = locationCoordinates;
+      
+      final searchResults = await _searchService.searchByBrand(
+        query,
+        brandId,
+        type: type,
+        latitude: lat,
+        longitude: lng,
+      );
+      
+      _restaurants = searchResults['restaurants'] as List<RestaurantModel>;
+      _products = searchResults['products'] as List<ProductModel>;
+      _categories = [];
+      _brands = [];
+      _errorMessage = null;
+      
+      if (hasResults) {
+        _addToSearchHistory(query);
+      }
+    } catch (e) {
+      _errorMessage = 'Brand search failed: ${e.toString()}';
+      _restaurants = [];
+      _products = [];
+      _categories = [];
+      _brands = [];
+      debugPrint('Brand search error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();

@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:ui';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'core/routes/app_router.dart';
 import 'core/constants/app_constants.dart';
+import 'core/theme/app_colors.dart';
 import 'core/services/social_login_service.dart';
 import 'core/services/firebase_service.dart';
+import 'core/services/notification_service.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/dashboard/providers/dashboard_provider.dart';
 import 'features/restaurants/providers/restaurant_provider.dart';
@@ -21,17 +25,53 @@ import 'features/profile/providers/address_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  await FirebaseService.instance.initialize();
+  // Add global error handler
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('Flutter Error: ${details.exception}');
+    debugPrint('Stack trace: ${details.stack}');
+  };
 
-  // Set up background message handler
-  FirebaseMessaging.onBackgroundMessage(
-      FirebaseService.firebaseMessagingBackgroundHandler);
+  // Handle platform errors
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Platform Error: $error');
+    debugPrint('Stack trace: $stack');
+    return true;
+  };
 
-  // Initialize social login service
-  SocialLoginService().initialize();
+  try {
+    // Initialize Firebase - catch errors gracefully
+    try {
+      await FirebaseService.instance.initialize();
+      
+      // Set up background message handler - use our enhanced handler
+      FirebaseMessaging.onBackgroundMessage(handleBackgroundMessage);
+    } catch (e) {
+      debugPrint('Firebase initialization failed, continuing without Firebase: $e');
+      // App can still run without Firebase, just without push notifications
+    }
 
-  runApp(const MyApp());
+    // Initialize social login service
+    try {
+      SocialLoginService().initialize();
+    } catch (e) {
+      debugPrint('Social login initialization failed: $e');
+    }
+
+    // Initialize notification service
+    try {
+      await NotificationService().initialize();
+    } catch (e) {
+      debugPrint('Notification service initialization failed: $e');
+    }
+
+    runApp(const MyApp());
+  } catch (e, stackTrace) {
+    debugPrint('Fatal error during app initialization: $e');
+    debugPrint('Stack trace: $stackTrace');
+    // Still run the app but with limited functionality
+    runApp(const MyApp());
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -42,16 +82,56 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => AuthProvider()..init(),
+          create: (_) {
+            try {
+              final authProvider = AuthProvider();
+              authProvider.init();
+              return authProvider;
+            } catch (e) {
+              debugPrint('Error initializing AuthProvider: $e');
+              return AuthProvider(); // Return instance without init if it fails
+            }
+          },
         ),
         ChangeNotifierProvider(
-          create: (_) => DashboardProvider(),
+          create: (_) {
+            try {
+              return DashboardProvider();
+            } catch (e) {
+              debugPrint('Error initializing DashboardProvider: $e');
+              return DashboardProvider();
+            }
+          },
         ),
         ChangeNotifierProvider(
-          create: (_) => RestaurantProvider(),
+          create: (_) {
+            try {
+              return RestaurantProvider();
+            } catch (e) {
+              debugPrint('Error initializing RestaurantProvider: $e');
+              return RestaurantProvider();
+            }
+          },
         ),
         ChangeNotifierProvider(
-          create: (_) => CartProvider(),
+          create: (_) {
+            try {
+              return AddressProvider();
+            } catch (e) {
+              debugPrint('Error initializing AddressProvider: $e');
+              return AddressProvider();
+            }
+          },
+        ),
+        ChangeNotifierProxyProvider<AddressProvider, CartProvider>(
+          create: (context) => CartProvider(
+            addressProvider: context.read<AddressProvider>(),
+          ),
+          update: (context, addressProvider, previous) =>
+              previous ??
+              CartProvider(
+                addressProvider: addressProvider,
+              ),
         ),
         ChangeNotifierProvider(
           create: (_) => SearchProvider(),
@@ -61,9 +141,6 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => CategoryProvider(),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => AddressProvider(),
         ),
         ChangeNotifierProxyProvider3<AuthProvider, CartProvider, AddressProvider, PaymentProvider>(
           create: (context) => PaymentProvider(
@@ -92,17 +169,17 @@ class MyApp extends StatelessWidget {
             title: AppConstants.appName,
             debugShowCheckedModeBanner: false,
             theme: ThemeData(
-              primaryColor: const Color(0xFF1E88E5),
+              primaryColor: AppColors.primaryColor,
               colorScheme: ColorScheme.fromSeed(
-                seedColor: const Color(0xFF1E88E5),
-                primary: const Color(0xFF1E88E5),
+                seedColor: AppColors.primaryColor,
+                primary: AppColors.primaryColor,
               ),
               textTheme: GoogleFonts.poppinsTextTheme(
                 Theme.of(context).textTheme,
               ),
               elevatedButtonTheme: ElevatedButtonThemeData(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E88E5),
+                  backgroundColor: AppColors.primaryColor,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12.r),
@@ -133,8 +210,8 @@ class MyApp extends StatelessWidget {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12.r),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF1E88E5),
+                  borderSide: BorderSide(
+                    color: AppColors.primaryColor,
                     width: 2,
                   ),
                 ),
@@ -151,7 +228,7 @@ class MyApp extends StatelessWidget {
               ),
               useMaterial3: true,
             ),
-            routerConfig: AppRouter.router,
+            routerConfig: AppRouter.createRouter(context),
           );
         },
       ),

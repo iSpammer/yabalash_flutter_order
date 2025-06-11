@@ -118,8 +118,28 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
 
     if (success && mounted) {
-      // Navigate to verification screen if needed
-      context.go('/verify-account');
+      // Check if verification is required
+      final user = authProvider.user;
+      
+      // Debug logging
+      debugPrint('Registration successful');
+      debugPrint('User data: ${user?.toJson()}');
+      debugPrint('Needs phone verification: ${user?.needsPhoneVerification}');
+      debugPrint('Needs email verification: ${user?.needsEmailVerification}');
+      
+      // For now, always go to verification screen to match React Native behavior
+      // The backend might enforce verification even if client_preference says 0
+      if (user != null) {
+        // Navigate to verification screen with contact info
+        context.go('/verify-account', extra: {
+          'phoneNumber': '$_selectedDialCode $_phoneController.text',
+          'email': _emailController.text,
+          'authToken': user.authToken,
+        });
+      } else {
+        // Fallback to home if no user data
+        context.go('/home');
+      }
     }
   }
 
@@ -179,31 +199,52 @@ class _RegisterScreenState extends State<RegisterScreen>
                               opacity: value,
                               child: Column(
                                 children: [
-                                  Container(
-                                    width: 80.w,
-                                    height: 80.w,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Theme.of(context).primaryColor,
-                                          Theme.of(context).primaryColor.withValues(alpha: 0.7),
+                                  Hero(
+                                    tag: 'app_logo',
+                                    child: Container(
+                                      width: 80.w,
+                                      height: 80.w,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(16.r),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.1),
+                                            blurRadius: 15,
+                                            offset: const Offset(0, 5),
+                                          ),
                                         ],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
                                       ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
-                                          blurRadius: 30,
-                                          offset: const Offset(0, 15),
+                                      child: Container(
+                                        padding: EdgeInsets.all(6.w),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(16.r),
+                                          color: Colors.white,
                                         ),
-                                      ],
-                                    ),
-                                    child: Icon(
-                                      Icons.person_add,
-                                      size: 40.sp,
-                                      color: Colors.white,
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(10.r),
+                                          child: Image.asset(
+                                            'assets/icon/app_icon.png',
+                                            width: 68.w,
+                                            height: 68.w,
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
+                                                width: 68.w,
+                                                height: 68.w,
+                                                decoration: BoxDecoration(
+                                                  color: Theme.of(context).primaryColor,
+                                                  borderRadius: BorderRadius.circular(10.r),
+                                                ),
+                                                child: Icon(
+                                                  Icons.person_add,
+                                                  size: 34.sp,
+                                                  color: Colors.white,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                   SizedBox(height: 24.h),
@@ -434,7 +475,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         ),
                                         recognizer: TapGestureRecognizer()
                                           ..onTap = () {
-                                            // TODO: Navigate to terms
+                                            context.push('/terms-of-service');
                                           },
                                       ),
                                       const TextSpan(text: ' and '),
@@ -447,7 +488,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         ),
                                         recognizer: TapGestureRecognizer()
                                           ..onTap = () {
-                                            // TODO: Navigate to privacy
+                                            context.push('/privacy-policy');
                                           },
                                       ),
                                     ],

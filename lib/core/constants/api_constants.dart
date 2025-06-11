@@ -22,6 +22,10 @@ class ApiConstants {
   static const String sendToken = '/auth/sendToken';
   static const String countryList = '/auth/country-list';
   static const String shortCode = '/auth/shortCode';
+  static const String updateProfile = '/update/profile';
+  static const String changePassword = '/changePassword';
+  static const String updateProfileImage = '/update/image';
+  static const String sendReferralCode = '/send/referralcode';
 
   // Headers
   static const String header = '/header';

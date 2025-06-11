@@ -9,16 +9,22 @@ import '../providers/category_provider.dart';
 import '../models/category_detail_model.dart';
 import '../widgets/category_filters_widget.dart';
 import '../widgets/enhanced_product_card.dart';
+import '../widgets/vendor_grid.dart';
 import '../../../core/widgets/custom_button.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
+import '../../dashboard/widgets/delivery_pickup_toggle.dart';
+import '../../restaurants/widgets/restaurant_card_v2.dart';
 
 class CategoryScreen extends StatefulWidget {
   final int categoryId;
   final String? categoryName;
+  final String? categoryImage;
 
   const CategoryScreen({
     super.key,
     required this.categoryId,
     this.categoryName,
+    this.categoryImage,
   });
 
   @override
@@ -35,8 +41,24 @@ class _CategoryScreenState extends State<CategoryScreen> {
     super.initState();
     _provider = context.read<CategoryProvider>();
     _scrollController.addListener(_onScroll);
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Set delivery type from dashboard
+      final dashboardProvider = context.read<DashboardProvider>();
+      _provider.setDeliveryType(
+          dashboardProvider.deliveryMode == DeliveryMode.delivery
+              ? 'delivery'
+              : 'takeaway');
+
+      // Set location if available
+      final (lat, lng) = dashboardProvider.locationCoordinates;
+      if (lat != null && lng != null) {
+        _provider.setLocation(
+          latitude: lat,
+          longitude: lng,
+        );
+      }
+
       _provider.loadCategoryDetails(widget.categoryId);
     });
   }
@@ -49,7 +71,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= 
+    if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent * 0.8) {
       _provider.loadMoreProducts(widget.categoryId);
     }
@@ -84,9 +106,9 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
   Widget _buildCategoryAppBar(CategoryProvider provider) {
     final category = provider.categoryDetail;
-    
+
     return SliverAppBar(
-      expandedHeight: 200.h,
+      expandedHeight: 250.h,
       pinned: true,
       elevation: 0,
       backgroundColor: Theme.of(context).primaryColor,
@@ -124,29 +146,57 @@ class _CategoryScreenState extends State<CategoryScreen> {
         SizedBox(width: 8.w),
       ],
       flexibleSpace: FlexibleSpaceBar(
-        title: Text(
-          category?.name ?? widget.categoryName ?? 'Category',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18.sp,
-            fontWeight: FontWeight.w600,
-            shadows: [
-              Shadow(
-                offset: const Offset(0, 1),
-                blurRadius: 3,
-                color: Colors.black.withValues(alpha: 0.5),
+        title: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              category?.name ?? widget.categoryName ?? 'Category',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                shadows: [
+                  Shadow(
+                    offset: const Offset(0, 1),
+                    blurRadius: 3,
+                    color: Colors.black.withValues(alpha: 0.5),
+                  ),
+                ],
+              ),
+            ),
+            if (category?.description != null &&
+                category!.description!.isNotEmpty) ...[
+              SizedBox(height: 4.h),
+              Text(
+                category.description!,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w400,
+                  shadows: [
+                    Shadow(
+                      offset: const Offset(0, 1),
+                      blurRadius: 2,
+                      color: Colors.black.withValues(alpha: 0.4),
+                    ),
+                  ],
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
-          ),
+          ],
         ),
-        titlePadding: EdgeInsets.only(left: 16.w, bottom: 16.h),
+        titlePadding: EdgeInsets.only(left: 16.w, bottom: 16.h, right: 16.w),
         background: _buildCategoryBanner(category),
       ),
     );
   }
 
   Widget _buildCategoryBanner(CategoryDetailModel? category) {
-    final imageUrl = category?.displayImage;
+    // Use displayImage from API response, fallback to passed categoryImage
+    final imageUrl = category?.displayImage ?? widget.categoryImage;
     if (imageUrl != null && imageUrl.isNotEmpty) {
       return Stack(
         fit: StackFit.expand,
@@ -237,19 +287,19 @@ class _CategoryScreenState extends State<CategoryScreen> {
                     style: OutlinedButton.styleFrom(
                       padding: EdgeInsets.symmetric(vertical: 12.h),
                       side: BorderSide(
-                        color: provider.hasFiltersApplied 
-                            ? Theme.of(context).primaryColor 
+                        color: provider.hasFiltersApplied
+                            ? Theme.of(context).primaryColor
                             : Colors.grey[400]!,
                       ),
-                      foregroundColor: provider.hasFiltersApplied 
-                          ? Theme.of(context).primaryColor 
+                      foregroundColor: provider.hasFiltersApplied
+                          ? Theme.of(context).primaryColor
                           : Colors.grey[700],
                     ),
                   ),
                 ),
-                
+
                 SizedBox(width: 12.w),
-                
+
                 // Sort button
                 Expanded(
                   child: OutlinedButton.icon(
@@ -269,7 +319,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 ),
               ],
             ),
-            
+
             // Applied filters display
             if (provider.hasFiltersApplied) ...[
               SizedBox(height: 8.h),
@@ -291,7 +341,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () => provider.clearAllFilters(widget.categoryId),
+                    onPressed: () =>
+                        provider.clearAllFilters(widget.categoryId),
                     child: Text(
                       'Clear All',
                       style: TextStyle(
@@ -303,18 +354,24 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 ],
               ),
             ],
-            
+
             // Results count
             if (provider.totalProducts > 0) ...[
               SizedBox(height: 8.h),
               Row(
                 children: [
-                  Text(
-                    '${provider.totalProducts} products found',
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
+                  Expanded(
+                    child: Text(
+                      provider.isVendorCategory
+                          ? '${provider.totalProducts} vendors found'
+                          : '${provider.totalProducts} products found',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -327,7 +384,16 @@ class _CategoryScreenState extends State<CategoryScreen> {
   }
 
   Widget _buildProductsSection(CategoryProvider provider) {
-    if (provider.isLoadingProducts && provider.products.isEmpty) {
+    debugPrint(
+        'Building products section - isVendorCategory: ${provider.isVendorCategory}, vendors: ${provider.vendors.length}, products: ${provider.products.length}');
+
+    // Determine content type based on category type or actual data
+    final hasVendors = provider.vendors.isNotEmpty;
+    final hasProducts = provider.products.isNotEmpty;
+
+    if (provider.isLoadingProducts &&
+        provider.products.isEmpty &&
+        provider.vendors.isEmpty) {
       return SliverFillRemaining(
         child: Center(
           child: Column(
@@ -336,7 +402,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
               CircularProgressIndicator(),
               SizedBox(height: 16.h),
               Text(
-                'Loading products...',
+                'Loading items...',
                 style: TextStyle(
                   fontSize: 16.sp,
                   color: Colors.grey[600],
@@ -348,7 +414,9 @@ class _CategoryScreenState extends State<CategoryScreen> {
       );
     }
 
-    if (provider.productsError != null && provider.products.isEmpty) {
+    if (provider.productsError != null &&
+        provider.products.isEmpty &&
+        provider.vendors.isEmpty) {
       return SliverFillRemaining(
         child: Center(
           child: Padding(
@@ -363,7 +431,9 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 ),
                 SizedBox(height: 16.h),
                 Text(
-                  'Failed to load products',
+                  provider.isVendorCategory
+                      ? 'Failed to load vendors'
+                      : 'Failed to load products',
                   style: TextStyle(
                     fontSize: 18.sp,
                     fontWeight: FontWeight.w600,
@@ -382,7 +452,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 SizedBox(height: 24.h),
                 CustomButton(
                   text: 'Try Again',
-                  onPressed: () => provider.loadProducts(widget.categoryId, refresh: true),
+                  onPressed: () =>
+                      provider.loadProducts(widget.categoryId, refresh: true),
                 ),
               ],
             ),
@@ -391,7 +462,110 @@ class _CategoryScreenState extends State<CategoryScreen> {
       );
     }
 
-    if (provider.products.isEmpty) {
+    // Handle both vendors and products based on what's available
+    if (hasVendors && !hasProducts) {
+      // Only vendors available
+      return SliverFillRemaining(
+        hasScrollBody: true,
+        fillOverscroll: false,
+        child: VendorGrid(
+          vendors: provider.vendors,
+          isLoading: provider.isLoadingMoreProducts,
+          scrollController: ScrollController(),
+          onLoadMore: () => provider.loadMoreProducts(widget.categoryId),
+        ),
+      );
+    } else if (hasProducts && !hasVendors) {
+      // Only products available - display as list
+      return SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            if (index < provider.products.length) {
+              final product = provider.products[index];
+              return Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+                child: EnhancedProductCard(
+                  product: product,
+                  showVendorName: true,
+                  onTap: () => context.push('/product/${product.id}'),
+                ),
+              );
+            }
+            return null;
+          },
+          childCount: provider.products.length,
+        ),
+      );
+    } else if (hasVendors && hasProducts) {
+      // Both vendors and products - show in sections
+      return SliverList(
+        delegate: SliverChildListDelegate([
+          // Vendors section
+          if (hasVendors) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+              child: Text(
+                'Restaurants',
+                style: TextStyle(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            SizedBox(
+              height: 280.h,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                itemCount: provider.vendors.length,
+                itemBuilder: (context, index) {
+                  final vendor = provider.vendors[index];
+                  return Padding(
+                    padding: EdgeInsets.only(right: 12.w),
+                    child: SizedBox(
+                      width: 280.w,
+                      child: RestaurantCardV2(
+                        restaurant: vendor,
+                        onTap: () => context.push('/restaurant/${vendor.id}'),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: 24.h),
+          ],
+
+          // Products section
+          if (hasProducts) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+              child: Text(
+                'Products',
+                style: TextStyle(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            ...provider.products.map((product) => Padding(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+                  child: EnhancedProductCard(
+                    product: product,
+                    showVendorName: true,
+                    onTap: () => context.push('/product/${product.id}'),
+                  ),
+                )),
+          ],
+        ]),
+      );
+    }
+
+    // No items found
+    if (!hasVendors && !hasProducts) {
       return SliverFillRemaining(
         child: Center(
           child: Padding(
@@ -426,7 +600,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
                   SizedBox(height: 24.h),
                   CustomButton(
                     text: 'Clear Filters',
-                    onPressed: () => provider.clearAllFilters(widget.categoryId),
+                    onPressed: () =>
+                        provider.clearAllFilters(widget.categoryId),
                   ),
                 ],
               ],
@@ -510,7 +685,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
 }
 
 // Show filters widget in a modal
-void showFiltersModal(BuildContext context, CategoryProvider provider, int categoryId) {
+void showFiltersModal(
+    BuildContext context, CategoryProvider provider, int categoryId) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/api/api_service.dart';
 import '../../../core/constants/api_constants.dart';
@@ -154,11 +155,11 @@ class AuthService {
     );
   }
   
-  Future<ApiResponse<bool>> verifyAccount({
+  Future<ApiResponse<UserModel>> verifyAccount({
     required String type,
     required String otp,
   }) async {
-    final response = await _apiService.post(
+    final response = await _apiService.post<Map<String, dynamic>>(
       ApiConstants.verifyAccount,
       data: {
         'type': type,
@@ -166,10 +167,19 @@ class AuthService {
       },
     );
     
-    return ApiResponse<bool>(
-      success: response.success,
-      message: response.message,
-      data: response.success,
+    if (response.success && response.data != null) {
+      // The API might return user data after verification
+      final userData = response.data!['data'] ?? response.data!;
+      if (userData is Map<String, dynamic> && userData.containsKey('id')) {
+        final user = UserModel.fromJson(userData);
+        await _saveUserData(user);
+        return ApiResponse.success(data: user);
+      }
+    }
+    
+    return ApiResponse.error(
+      message: response.message ?? 'Verification failed',
+      errors: response.errors,
     );
   }
   
@@ -186,10 +196,17 @@ class AuthService {
     );
   }
   
-  Future<ApiResponse<bool>> sendVerificationToken({required String type}) async {
+  Future<ApiResponse<bool>> sendVerificationToken({required String type, String? authToken}) async {
+    // If auth token is provided, use it instead of the saved one
+    Map<String, dynamic>? headers;
+    if (authToken != null) {
+      headers = {'Authorization': authToken};
+    }
+    
     final response = await _apiService.post(
       ApiConstants.sendToken,
       data: {'type': type},
+      headers: headers,
     );
     
     return ApiResponse<bool>(
@@ -233,6 +250,59 @@ class AuthService {
     );
   }
   
+  Future<ApiResponse<Map<String, dynamic>>> getSocialInfo({
+    required String type,
+  }) async {
+    final response = await _apiService.post<Map<String, dynamic>>(
+      '/social/info',
+      data: {'type': type},
+    );
+    
+    if (response.success && response.data != null) {
+      return ApiResponse.success(data: response.data!);
+    }
+    
+    return ApiResponse.error(
+      message: response.message ?? 'Failed to get social info',
+    );
+  }
+  
+  Future<ApiResponse<UserModel>> updateProfileWithPhone({
+    required String phoneNumber,
+    required String dialCode,
+    required String countryCode,
+  }) async {
+    // Get current user data to include all required fields
+    final currentUser = await getCurrentUser();
+    if (currentUser == null) {
+      return ApiResponse.error(message: 'User not found');
+    }
+    
+    final response = await _apiService.post<Map<String, dynamic>>(
+      ApiConstants.updateProfile,
+      data: {
+        'name': currentUser.name ?? '',
+        'email': currentUser.email ?? '',
+        'phone_number': phoneNumber,
+        'callingCode': dialCode,
+        'country_code': countryCode,
+      },
+    );
+    
+    if (response.success && response.data != null) {
+      // Parse the updated user data
+      final userData = response.data!['data'] ?? response.data!;
+      final updatedUser = UserModel.fromJson(userData);
+      await _saveUserData(updatedUser);
+      return ApiResponse.success(data: updatedUser);
+    }
+    
+    return ApiResponse.error(
+      message: response.message ?? 'Failed to update phone number',
+      errors: response.errors,
+    );
+  }
+  
   Future<void> _saveUserData(UserModel user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(AppConstants.userDataKey, jsonEncode(user.toJson()));
@@ -260,13 +330,14 @@ class AuthService {
     final response = await _apiService.post<Map<String, dynamic>>(
       '/social/login/$provider',
       data: {
-        'auth_id': socialData['id'],  // Changed from social_id to auth_id to match React Native
+        'auth_id': socialData['id'],
         'name': socialData['name'],
         'email': socialData['email'],
-        'avatar': socialData['photo'],
+        'phone_number': socialData['phoneNumber'] ?? '',
+        'dial_code': socialData['dialCode'] ?? '971',
+        'country_code': socialData['countryCode'] ?? 'AE',
         'device_type': deviceType,
         'device_token': deviceToken,
-        'fcm_token': deviceToken,  // Added fcm_token as expected by backend
         if (socialData['accessToken'] != null)
           'access_token': socialData['accessToken'],
         if (socialData['idToken'] != null)
@@ -275,7 +346,12 @@ class AuthService {
     );
     
     if (response.success && response.data != null) {
-      final user = UserModel.fromJson(response.data!['data'] ?? response.data!);
+      debugPrint('Social login response: ${response.data}');
+      final userData = response.data!['data'] ?? response.data!;
+      debugPrint('User data to parse: $userData');
+      final user = UserModel.fromJson(userData);
+      debugPrint('Parsed user phone: ${user.phoneNumber}');
+      debugPrint('Parsed phone required: ${user.phoneNumberRequired}');
       await _saveUserData(user);
       return ApiResponse.success(data: user);
     }

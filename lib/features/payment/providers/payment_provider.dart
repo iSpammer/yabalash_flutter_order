@@ -17,14 +17,14 @@ class PaymentProvider extends ChangeNotifier {
   PaymentMethod? _selectedPaymentMethod;
   bool _isLoading = false;
   String? _errorMessage;
-  
+
   // For card payments
   String? _cardNumber;
   String? _cardHolderName;
   String? _expiryMonth;
   String? _expiryYear;
   String? _cvv;
-  
+
   // Order details
   String? _deliveryInstructions;
   String? _orderNote;
@@ -93,7 +93,7 @@ class PaymentProvider extends ChangeNotifier {
         authToken: authProvider.authToken!,
       );
       _paymentMethods = methods;
-      
+
       // If a payment method was previously selected in cart, maintain that selection
       if (cartProvider.selectedPaymentMethodId != null) {
         _selectedPaymentMethod = _paymentMethods.firstWhere(
@@ -127,7 +127,7 @@ class PaymentProvider extends ChangeNotifier {
     }
 
     // Only require address for delivery orders
-    if (cartProvider.deliveryMode == DeliveryMode.delivery && 
+    if (cartProvider.deliveryMode == DeliveryMode.delivery &&
         addressProvider.selectedAddress == null) {
       _errorMessage = 'Please select a delivery address';
       notifyListeners();
@@ -139,11 +139,11 @@ class PaymentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // For pickup orders, use a default address ID (0 or vendor's address ID)
+      // For takeaway orders, use a default address ID (0 or vendor's address ID)
       final addressId = cartProvider.deliveryMode == DeliveryMode.delivery
           ? (addressProvider.selectedAddress?.numericId ?? 0)
-          : 0; // Use 0 for pickup orders
-      
+          : 0; // Use 0 for takeaway orders
+
       final request = PlaceOrderRequest(
         selectedAddressId: addressId,
         paymentOptionId: _selectedPaymentMethod!.id,
@@ -159,7 +159,9 @@ class PaymentProvider extends ChangeNotifier {
         expiryYear: _expiryYear,
         cvv: _cvv,
         transactionId: transactionId,
-        orderType: cartProvider.deliveryMode == DeliveryMode.delivery ? 'delivery' : 'pickup',
+        orderType: cartProvider.deliveryMode == DeliveryMode.delivery
+            ? 'delivery'
+            : 'takeaway',
       );
 
       final response = await _paymentService.placeOrder(

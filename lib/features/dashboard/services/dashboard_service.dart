@@ -16,40 +16,40 @@ class DashboardService {
   }) async {
     // Convert pickup to takeaway as per React Native implementation
     String apiType = type == 'pickup' ? 'takeaway' : type;
-    
+
     Map<String, dynamic> requestBody = {
-      'type': apiType,  // 'delivery', 'takeaway', 'dine_in'
-      'action': '2',  // Required for V2 API
+      'type': apiType, // 'delivery', 'takeaway', 'dine_in'
+      'action': '2', // Required for V2 API
       'open_close_vendor': 0,
     };
-    
+
     if (latitude != null && longitude != null) {
       requestBody['latitude'] = latitude.toString();
       requestBody['longitude'] = longitude.toString();
-      requestBody['address'] = '';  // Address field for location
+      requestBody['address'] = ''; // Address field for location
     }
 
     final response = await _apiService.post<Map<String, dynamic>>(
-      '/v2/homepage',  // Use V2 endpoint
+      '/v2/homepage', // Use V2 endpoint
       data: requestBody,
     );
 
     if (response.success && response.data != null) {
       final responseData = response.data!['data'] ?? response.data!;
-      
+
       // V2 API returns homePageLabels array with different sections
       final homePageLabels = responseData['homePageLabels'] as List? ?? [];
-      
+
       List<dynamic> banners = [];
       List<dynamic> categories = [];
       List<dynamic> vendors = [];
       List<dynamic> featuredProducts = [];
-      
+
       // Parse homePageLabels array to extract different sections
       for (var section in homePageLabels) {
         final sectionSlug = section['slug'] as String?;
         final sectionData = section['data'] as List? ?? [];
-        
+
         switch (sectionSlug) {
           case 'banner':
             banners = sectionData;
@@ -68,16 +68,18 @@ class DashboardService {
             break;
         }
       }
-      
+
       // Handle the V2 API response structure
       final dashboardData = {
         'banners': banners,
         'categories': categories,
-        'featured_restaurants': vendors.where((v) => v['is_featured'] == 1).toList(),
+        'featured_restaurants':
+            vendors.where((v) => v['is_featured'] == 1).toList(),
         'nearby_restaurants': vendors,
-        'popular_restaurants': vendors.where((v) => v['is_popular'] == 1).toList(),
+        'popular_restaurants':
+            vendors.where((v) => v['is_popular'] == 1).toList(),
       };
-      
+
       final dashboard = DashboardModel.fromJson(dashboardData);
       return ApiResponse.success(data: dashboard);
     }
@@ -95,53 +97,53 @@ class DashboardService {
   }) async {
     // Convert pickup to takeaway as per React Native implementation
     String apiType = type == 'pickup' ? 'takeaway' : type;
-    
+
     Map<String, dynamic> requestBody = {
-      'type': apiType,  // 'delivery', 'takeaway', 'dine_in'
-      'action': '2',  // Required for V2 API
+      'type': apiType, // 'delivery', 'takeaway', 'dine_in'
+      'action': '2', // Required for V2 API
       'open_close_vendor': 0,
     };
-    
+
     if (latitude != null && longitude != null) {
       requestBody['latitude'] = latitude.toString();
       requestBody['longitude'] = longitude.toString();
-      requestBody['address'] = '';  // Address field for location
+      requestBody['address'] = ''; // Address field for location
     }
 
     final response = await _apiService.post<Map<String, dynamic>>(
-      '/v2/homepage',  // Use V2 endpoint
+      '/v2/homepage', // Use V2 endpoint
       data: requestBody,
     );
 
     // Debug logging for pickup mode investigation
-    debugPrint('[Dashboard Service] API request type: $apiType (original: $type)');
-    debugPrint('[Dashboard Service] API response success: ${response.success}');
+    // debugPrint('[Dashboard Service] API request type: $apiType (original: $type)');
+    // debugPrint('[Dashboard Service] API response success: ${response.success}');
     if (response.data != null) {
-      final debugLabels = response.data!['data']?['homePageLabels'] as List? ?? [];
-      debugPrint('[Dashboard Service] Number of sections returned: ${debugLabels.length}');
+      final debugLabels =
+          response.data!['data']?['homePageLabels'] as List? ?? [];
+      // debugPrint('[Dashboard Service] Number of sections returned: ${debugLabels.length}');
       for (var section in debugLabels) {
         final dataLength = (section['data'] as List?)?.length ?? 0;
-        debugPrint('[Dashboard Service] Section ${section['slug']}: $dataLength items');
+        // debugPrint('[Dashboard Service] Section ${section['slug']}: $dataLength items');
       }
     }
 
     if (response.success && response.data != null) {
       final responseData = response.data!['data'] ?? response.data!;
-      
+
       // V2 API returns homePageLabels array with different sections
       final homePageLabels = responseData['homePageLabels'] as List? ?? [];
-      
+
       final sections = homePageLabels
           .map((sectionJson) => DashboardSection.fromJson(sectionJson))
           .where((section) {
-            // Debug each section
-            debugPrint('[Dashboard Service] Section ${section.slug} (${section.title}): shouldDisplay=${section.shouldDisplay}, dataLength=${section.data.length}');
-            return section.shouldDisplay;
-          })
-          .toList();
-      
-      debugPrint('[Dashboard Service] Total sections after filtering: ${sections.length}');
-      
+        // Debug each section
+        // debugPrint('[Dashboard Service] Section ${section.slug} (${section.title}): shouldDisplay=${section.shouldDisplay}, dataLength=${section.data.length}');
+        return section.shouldDisplay;
+      }).toList();
+
+      // debugPrint('[Dashboard Service] Total sections after filtering: ${sections.length}');
+
       return ApiResponse.success(data: sections);
     }
 
@@ -157,8 +159,9 @@ class DashboardService {
     if (response.success && response.data != null) {
       final categoriesData = response.data!['data'] ?? response.data!;
       final categories = (categoriesData['categories'] as List?)
-          ?.map((e) => CategoryModel.fromJson(e))
-          .toList() ?? [];
+              ?.map((e) => CategoryModel.fromJson(e))
+              .toList() ??
+          [];
       return ApiResponse.success(data: categories);
     }
 
@@ -180,7 +183,7 @@ class DashboardService {
       'page': page.toString(),
       'limit': limit.toString(),
     };
-    
+
     if (latitude != null && longitude != null) {
       queryParams['latitude'] = latitude.toString();
       queryParams['longitude'] = longitude.toString();
@@ -194,8 +197,9 @@ class DashboardService {
     if (response.success && response.data != null) {
       final restaurantsData = response.data!['data'] ?? response.data!;
       final restaurants = (restaurantsData['vendors'] as List?)
-          ?.map((e) => RestaurantModel.fromJson(e))
-          .toList() ?? [];
+              ?.map((e) => RestaurantModel.fromJson(e))
+              .toList() ??
+          [];
       return ApiResponse.success(data: restaurants);
     }
 
@@ -218,12 +222,12 @@ class DashboardService {
       'page': page.toString(),
       'limit': limit.toString(),
     };
-    
+
     if (latitude != null && longitude != null) {
       queryParams['latitude'] = latitude.toString();
       queryParams['longitude'] = longitude.toString();
     }
-    
+
     if (categoryId != null) {
       queryParams['category_id'] = categoryId.toString();
     }
@@ -236,8 +240,9 @@ class DashboardService {
     if (response.success && response.data != null) {
       final searchData = response.data!['data'] ?? response.data!;
       final restaurants = (searchData['vendors'] as List?)
-          ?.map((e) => RestaurantModel.fromJson(e))
-          .toList() ?? [];
+              ?.map((e) => RestaurantModel.fromJson(e))
+              .toList() ??
+          [];
       return ApiResponse.success(data: restaurants);
     }
 
@@ -253,7 +258,7 @@ class DashboardService {
     double? longitude,
   }) async {
     Map<String, dynamic> queryParams = {};
-    
+
     if (latitude != null && longitude != null) {
       queryParams['latitude'] = latitude.toString();
       queryParams['longitude'] = longitude.toString();
@@ -265,7 +270,8 @@ class DashboardService {
     );
 
     if (response.success && response.data != null) {
-      final restaurant = RestaurantModel.fromJson(response.data!['data'] ?? response.data!);
+      final restaurant =
+          RestaurantModel.fromJson(response.data!['data'] ?? response.data!);
       return ApiResponse.success(data: restaurant);
     }
 

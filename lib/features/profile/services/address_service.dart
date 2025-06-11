@@ -78,7 +78,7 @@ class AddressService {
         'city': city,
         'state': state,
         'country': country,
-        'pincode': pincode,
+        if (pincode.isNotEmpty) 'pincode': pincode,
         'latitude': latitude.toString(),
         'longitude': longitude.toString(),
         'address_type': addressType.toString(),
@@ -133,7 +133,7 @@ class AddressService {
         'city': city,
         'state': state,
         'country': country,
-        'pincode': pincode,
+        if (pincode.isNotEmpty) 'pincode': pincode,
         'latitude': latitude.toString(),
         'longitude': longitude.toString(),
         'address_type': addressType.toString(),
@@ -178,11 +178,11 @@ class AddressService {
   }
   
   /// Set an address as primary/default
-  /// GET /api/v1/user/address/{id}/primary
+  /// GET /api/v1/primary/address/{id}
   Future<ApiResponse<bool>> setDefaultAddress(String addressId) async {
     try {
       final response = await _apiService.get<bool>(
-        '/user/address/$addressId/primary',
+        '/primary/address/$addressId',
         fromJsonT: (json) {
           return json['success'] == true || json['status'] == 'success';
         },

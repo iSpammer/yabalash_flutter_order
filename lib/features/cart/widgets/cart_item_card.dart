@@ -104,9 +104,11 @@ class CartItemCard extends StatelessWidget {
                           fontSize: 12.sp,
                           color: Colors.grey[600],
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     );
-                  }).toList(),
+                  }),
 
                 // Addons
                 if (cartItem.productAddons != null && cartItem.productAddons!.isNotEmpty)
@@ -124,14 +126,19 @@ class CartItemCard extends StatelessWidget {
                       ),
                       ...cartItem.productAddons!.map((addon) {
                         final addonPrice = (addon.price ?? 0) * (addon.multiplier ?? 1);
-                        return Text(
-                          '${addon.addonTitle}: ${addon.optionTitle} (+${currencyFormat.format(addonPrice)})',
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            color: Colors.grey[600],
+                        return Padding(
+                          padding: EdgeInsets.only(bottom: 2.h),
+                          child: Text(
+                            '${addon.addonTitle}: ${addon.optionTitle} (+${currencyFormat.format(addonPrice)})',
+                            style: TextStyle(
+                              fontSize: 12.sp,
+                              color: Colors.grey[600],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         );
-                      }).toList(),
+                      }),
                     ],
                   ),
 

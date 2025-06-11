@@ -107,8 +107,34 @@ class RestaurantService {
         }
         
         // Extract products and categories from the response
-        final productsData = responseData['products'];
+        List<dynamic>? productsData;
         final categoriesData = responseData['categories'];
+        
+        // If categories contain products, extract them
+        if (categoriesData != null && categoriesData is List) {
+          List<dynamic> allProducts = [];
+          for (var category in categoriesData) {
+            if (category['products'] != null && category['products'] is List) {
+              allProducts.addAll(category['products']);
+            }
+          }
+          if (allProducts.isNotEmpty) {
+            productsData = allProducts;
+          }
+        }
+        
+        // Otherwise look for products at root level
+        if (productsData == null) {
+          final products = responseData['products'];
+          if (products != null) {
+            // Handle paginated response structure
+            if (products is Map && products['data'] != null) {
+              productsData = products['data'];
+            } else if (products is List) {
+              productsData = products;
+            }
+          }
+        }
         
         if (vendorData.containsKey('show_slot')) {
           debugPrint('show_slot value: ${vendorData['show_slot']}');
@@ -117,9 +143,7 @@ class RestaurantService {
           debugPrint('is_open value: ${vendorData['is_open']}');
         }
         if (productsData != null) {
-          if (productsData is Map && productsData.containsKey('data')) {
-            debugPrint('Products count in response: ${(productsData['data'] as List?)?.length ?? 0}');
-          } else if (productsData is List) {
+          if (productsData is List) {
             debugPrint('Products count in response: ${productsData.length}');
           }
         }
@@ -129,9 +153,18 @@ class RestaurantService {
         
         // Add products and categories to vendor data for model parsing
         final enrichedVendorData = Map<String, dynamic>.from(vendorData);
-        if (productsData != null) {
+        
+        // For vendor endpoint response, extract products from pagination object
+        if (responseData.containsKey('products') && responseData['products'] is Map) {
+          final productsObj = responseData['products'] as Map<String, dynamic>;
+          if (productsObj.containsKey('data')) {
+            enrichedVendorData['products'] = productsObj['data'];
+            debugPrint('Found ${(productsObj['data'] as List).length} products in paginated response');
+          }
+        } else if (productsData != null) {
           enrichedVendorData['products'] = productsData;
         }
+        
         if (categoriesData != null) {
           enrichedVendorData['categories'] = categoriesData;
         }

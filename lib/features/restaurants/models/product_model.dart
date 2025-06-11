@@ -49,6 +49,11 @@ class ProductModel {
   final bool hasInventory; // From JSON: "has_inventory": 0 or 1
   final int? typeId; // Product type ID from API
 
+  // Time-based availability fields
+  final bool isLimitedTime; // From JSON: "is_limited_time"
+  final DateTime? availableFrom; // From JSON: "available_from"
+  final DateTime? availableUntil; // From JSON: "available_until"
+
   // Cart specific
   int quantity = 1;
   String? selectedVariantId;
@@ -93,6 +98,9 @@ class ProductModel {
     required this.sellWhenOutOfStock,
     required this.hasInventory,
     this.typeId,
+    required this.isLimitedTime,
+    this.availableFrom,
+    this.availableUntil,
   });
 
   static double? _parseDouble(dynamic value) {
@@ -124,18 +132,112 @@ class ProductModel {
     }
     return null;
   }
-  
+
+  static DateTime? _parseDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is String && value.isNotEmpty) {
+      try {
+        return DateTime.parse(value);
+      } catch (e) {
+        debugPrint('Error parsing DateTime from: $value, error: $e');
+        return null;
+      }
+    }
+    return null;
+  }
+
   static String? _extractImageUrl(dynamic value) {
     if (value == null) return null;
     if (value is String) return value.isNotEmpty ? value : null;
     if (value is Map) {
       // Try different possible paths for image URL
-      return value['image_path'] ?? 
-             value['path'] ?? 
-             value['url'] ?? 
-             value['original_image'] ??
-             value['image_s3_url'];
+      return value['image_path'] ??
+          value['path'] ??
+          value['url'] ??
+          value['original_image'] ??
+          value['image_s3_url'];
     }
+    return null;
+  }
+
+  static String? _extractCategoryName(Map<String, dynamic> json) {
+    // Direct category_name field
+    if (json['category_name'] != null && json['category_name'] is String) {
+      return json['category_name'];
+    }
+    
+    // Try translation_category_name (from vendor API)
+    if (json['translation_category_name'] != null && json['translation_category_name'] is String) {
+      return json['translation_category_name'];
+    }
+    
+    // Category object with name
+    if (json['category'] != null) {
+      final category = json['category'];
+      if (category is Map) {
+        // Direct name field
+        if (category['name'] != null && category['name'] is String) {
+          return category['name'];
+        }
+        
+        // Category detail with translation
+        if (category['category_detail'] != null) {
+          final detail = category['category_detail'];
+          if (detail is Map && detail['translation'] != null) {
+            final translation = detail['translation'];
+            if (translation is List && translation.isNotEmpty) {
+              final firstTranslation = translation[0];
+              if (firstTranslation is Map && firstTranslation['name'] != null) {
+                return firstTranslation['name'].toString();
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  static VendorInfoModel? _parseVendor(dynamic vendorData) {
+    if (vendorData == null) return null;
+    
+    try {
+      if (vendorData is Map<String, dynamic>) {
+        return VendorInfoModel.fromJson(vendorData);
+      }
+    } catch (e) {
+      debugPrint('Error parsing vendor: $e');
+    }
+    
+    return null;
+  }
+
+  static List<AddonModel>? _parseAddons(dynamic addonsData) {
+    if (addonsData == null) return null;
+    
+    try {
+      if (addonsData is List) {
+        return addonsData.map((a) => AddonModel.fromJson(a)).toList();
+      }
+    } catch (e) {
+      debugPrint('Error parsing addons: $e');
+    }
+    
+    return null;
+  }
+
+  static List<MediaModel>? _parseMedia(dynamic mediaData) {
+    if (mediaData == null) return null;
+    
+    try {
+      if (mediaData is List) {
+        return mediaData.map((m) => MediaModel.fromJson(m)).toList();
+      }
+    } catch (e) {
+      debugPrint('Error parsing media: $e');
+    }
+    
     return null;
   }
 
@@ -145,11 +247,19 @@ class ProductModel {
     debugPrint('JSON vals: ${json.values.toList()}');
 
     // Get the translation for the current language (default to language_id = 1)
-    final translations = json['translation'] != null
-        ? (json['translation'] as List)
-            .map((t) => TranslationModel.fromJson(t))
-            .toList()
-        : null;
+    List<TranslationModel>? translations;
+    try {
+      if (json['translation'] != null) {
+        if (json['translation'] is List) {
+          translations = (json['translation'] as List)
+              .map((t) => TranslationModel.fromJson(t))
+              .toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error parsing translations: $e');
+      translations = null;
+    }
 
     // Get the first translation (usually language_id = 1)
     final primaryTranslation =
@@ -159,19 +269,24 @@ class ProductModel {
     // Extract primary image from media array or direct path field
     String? primaryImage;
     String? thumbImage;
-    
+
     // Handle direct path field (flattened structure from some API endpoints)
     if (json['path'] != null && json['path'] is String) {
       // Direct path field - construct full image URL
       final imagePath = json['path'] as String;
       if (imagePath.isNotEmpty) {
-        primaryImage = 'https://yabalash-assets.s3.me-central-1.amazonaws.com/$imagePath';
+        primaryImage =
+            'https://yabalash-assets.s3.me-central-1.amazonaws.com/$imagePath';
         debugPrint('🖼️ Using direct path image: $primaryImage');
       }
     }
-    
+
+    debugPrint('full json is ${json}');
+
     // Handle nested media structure (if no direct path or as fallback)
-    if (primaryImage == null && json['media'] != null && (json['media'] as List).isNotEmpty) {
+    if (primaryImage == null &&
+        json['media'] != null &&
+        (json['media'] as List).isNotEmpty) {
       final mediaList = (json['media'] as List);
       // Find default image or use first
       final defaultMedia = mediaList.firstWhere(
@@ -190,7 +305,7 @@ class ProductModel {
         if (path['proxy_url'] != null && path['image_path'] != null) {
           String proxyUrl = path['proxy_url'].toString();
           String imagePath = path['image_path'].toString();
-          
+
           // Remove trailing slash from proxy_url and leading slash from image_path to avoid double slashes
           if (proxyUrl.endsWith('/')) {
             proxyUrl = proxyUrl.substring(0, proxyUrl.length - 1);
@@ -198,7 +313,7 @@ class ProductModel {
           if (imagePath.startsWith('/')) {
             imagePath = imagePath.substring(1);
           }
-          
+
           primaryImage = '$proxyUrl/$imagePath';
           debugPrint('🖼️ Using constructed proxy image: $primaryImage');
         }
@@ -207,19 +322,25 @@ class ProductModel {
 
     // Parse variants - handle both 'variant' and 'variants' keys
     List<VariantModel>? variantsList;
-    if (json['variant'] != null && (json['variant'] as List).isNotEmpty) {
-      debugPrint(
-          'Found variants in variant key: ${(json['variant'] as List).length}');
-      variantsList = (json['variant'] as List)
-          .map((v) => VariantModel.fromJson(v))
-          .toList();
-    } else if (json['variants'] != null &&
-        (json['variants'] as List).isNotEmpty) {
-      debugPrint(
-          'Found variants in variants key: ${(json['variants'] as List).length}');
-      variantsList = (json['variants'] as List)
-          .map((v) => VariantModel.fromJson(v))
-          .toList();
+    try {
+      if (json['variant'] != null && json['variant'] is List && (json['variant'] as List).isNotEmpty) {
+        debugPrint(
+            'Found variants in variant key: ${(json['variant'] as List).length}');
+        variantsList = (json['variant'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map((v) => VariantModel.fromJson(v))
+            .toList();
+      } else if (json['variants'] != null && json['variants'] is List && (json['variants'] as List).isNotEmpty) {
+        debugPrint(
+            'Found variants in variants key: ${(json['variants'] as List).length}');
+        variantsList = (json['variants'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map((v) => VariantModel.fromJson(v))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error parsing variants: $e');
+      variantsList = null;
     }
 
     // Get price from first variant if no direct price
@@ -233,24 +354,31 @@ class ProductModel {
       debugPrint('Using variant price: $productPrice, compare: $comparePrice');
     } else {
       // Handle both price/compare_at_price and price_numeric/compare_price_numeric
-      productPrice = _parseDouble(json['price_numeric']) ?? 
-                    _parseDouble(json['price']) ?? 0.0;
-      comparePrice = _parseDouble(json['compare_price_numeric']) ?? 
-                    _parseDouble(json['compare_at_price']);
+      // Also check for variant_price from vendor API
+      productPrice = _parseDouble(json['variant_price']) ??
+          _parseDouble(json['price_numeric']) ??
+          _parseDouble(json['price']) ??
+          0.0;
+      comparePrice = _parseDouble(json['compare_price_numeric']) ??
+          _parseDouble(json['compare_at_price']);
       debugPrint('Using direct price: $productPrice, compare: $comparePrice');
-      debugPrint('🔍 Price debug - price_numeric: ${json['price_numeric']}, price: ${json['price']}');
-      debugPrint('🔍 Compare debug - compare_price_numeric: ${json['compare_price_numeric']}, compare_at_price: ${json['compare_at_price']}');
+      debugPrint(
+          '🔍 Price debug - variant_price: ${json['variant_price']}, price_numeric: ${json['price_numeric']}, price: ${json['price']}');
+      debugPrint(
+          '🔍 Compare debug - compare_price_numeric: ${json['compare_price_numeric']}, compare_at_price: ${json['compare_at_price']}');
     }
 
     final product = ProductModel(
       id: _parseInt(json['id']) ?? 0,
-      name: primaryTranslation?.title ?? json['title'] ?? json['name'] ?? '',
+      name: primaryTranslation?.title ?? json['translation_title'] ?? json['title'] ?? json['name'] ?? '',
       description: HtmlUtils.safeExtractText(primaryTranslation?.bodyHtml ??
+          json['translation_description'] ??
           json['description'] ??
           primaryTranslation?.metaDescription),
       bodyHtml: primaryTranslation?.bodyHtml ?? json['body_html'],
       image: primaryImage ??
           _extractImageUrl(json['image']) ??
+          json['product_image'] ??
           json['image_url'] ??
           _extractImageUrl(json['product_image']),
       thumbImage: thumbImage ?? json['thumb_image_url'],
@@ -264,9 +392,9 @@ class ProductModel {
       vendorId: _parseInt(json['vendor_id']) ?? 0,
       categoryId:
           _parseInt(json['category_id'] ?? json['category']?['id']) ?? 0,
-      categoryName: json['category']?['name'] ??
-          json['category']?['category_detail']?['translation']?[0]?['name'],
-      isActive: json['is_active'] == 1 ||
+      categoryName: _extractCategoryName(json),
+      isActive: json['is_currently_available'] == true ||
+          json['is_active'] == 1 ||
           json['is_live'] == 1 ||
           json['status'] == 'active' ||
           json['status'] == 1,
@@ -288,15 +416,9 @@ class ProductModel {
               : [json['tags'].toString()])
           : null,
       variants: variantsList,
-      addons: json['add_on'] != null
-          ? (json['add_on'] as List).map((a) => AddonModel.fromJson(a)).toList()
-          : null,
-      media: json['media'] != null
-          ? (json['media'] as List).map((m) => MediaModel.fromJson(m)).toList()
-          : null,
-      vendor: json['vendor'] != null
-          ? VendorInfoModel.fromJson(json['vendor'])
-          : null,
+      addons: _parseAddons(json['add_on']),
+      media: _parseMedia(json['media']),
+      vendor: _parseVendor(json['vendor']),
       translations: translations,
       unit: json['unit'],
       minimumOrderCount: _parseDouble(json['minimum_order_count']) ?? 1,
@@ -306,8 +428,11 @@ class ProductModel {
       sellWhenOutOfStock: _parseInt(json['sell_when_out_of_stock']) == 1,
       hasInventory: _parseInt(json['has_inventory']) == 1,
       typeId: _parseInt(json['type_id']),
+      isLimitedTime: json['is_limited_time'] == true || json['is_limited_time'] == 1,
+      availableFrom: _parseDateTime(json['available_from']),
+      availableUntil: _parseDateTime(json['available_until']),
     );
-    
+
     // Log critical field parsing for debugging
     StockDebugLogger.logApiParsing(
       json: json,
@@ -321,7 +446,7 @@ class ProductModel {
       rawValue: json['type_id'],
       parsedValue: _parseInt(json['type_id']),
     );
-    
+
     return product;
   }
 
@@ -365,6 +490,9 @@ class ProductModel {
       'sell_when_out_of_stock': sellWhenOutOfStock,
       'has_inventory': hasInventory,
       'type_id': typeId,
+      'is_limited_time': isLimitedTime,
+      'available_from': availableFrom?.toIso8601String(),
+      'available_until': availableUntil?.toIso8601String(),
     };
   }
 
@@ -410,13 +538,14 @@ class ProductModel {
     }
     return 'AED ${currentPrice.toStringAsFixed(2)}';
   }
-  
+
   /// Get total quantity across all variants (for products with variants)
   /// or the main stock quantity (for simple products)
   int get productTotalQuantity {
     if (hasVariants && variants != null && variants!.isNotEmpty) {
       // Sum up all variant quantities
-      return variants!.fold(0, (sum, variant) => sum + (variant.stockQuantity ?? 0));
+      return variants!
+          .fold(0, (sum, variant) => sum + (variant.stockQuantity ?? 0));
     }
     // For simple products, return the main stock quantity
     return stockQuantity ?? 0;
@@ -427,7 +556,7 @@ class ProductModel {
   bool get isInStock {
     // Calculate the result first
     bool result = _calculateIsInStock();
-    
+
     // Log the evaluation
     StockDebugLogger.logProductStock(
       productId: id,
@@ -439,17 +568,30 @@ class ProductModel {
       typeId: typeId,
       finalIsInStock: result,
     );
-    
+
     return result;
   }
-  
-  bool _calculateIsInStock() {
 
+  bool _calculateIsInStock() {
     // NOTE: React Native does NOT check isActive for stock availability
     // Commenting this out to match React Native behavior
     // if (!isActive) {
     //   return false; // Product is not active, so definitely not "in stock" for purchasing
     // }
+
+    // Check time-based availability first
+    if (isLimitedTime) {
+      final now = DateTime.now();
+      
+      // If product has availability window, check if current time is within range
+      if (availableFrom != null && now.isBefore(availableFrom!)) {
+        return false; // Product not yet available
+      }
+      
+      if (availableUntil != null && now.isAfter(availableUntil!)) {
+        return false; // Product availability has expired
+      }
+    }
 
     // React Native logic: Show add to cart if ANY of these conditions are true:
     // 1. has_inventory == 0 (inventory not tracked)
@@ -473,7 +615,7 @@ class ProductModel {
     if (!hasInventory) {
       return true;
     }
-    
+
     // Check if product has stock (React Native checks productTotalQuantity > 0)
     if (productTotalQuantity > 0) {
       return true;
@@ -485,5 +627,53 @@ class ProductModel {
     // - hasInventory is true (inventory is tracked)
     // - productTotalQuantity is 0 (no stock)
     return false; // Out of stock
+  }
+
+  /// Check if product is currently available based on time restrictions
+  bool get isCurrentlyAvailable {
+    if (!isLimitedTime) {
+      return true; // No time restrictions
+    }
+    
+    final now = DateTime.now();
+    
+    // Check if current time is within availability window
+    if (availableFrom != null && now.isBefore(availableFrom!)) {
+      return false; // Not yet available
+    }
+    
+    if (availableUntil != null && now.isAfter(availableUntil!)) {
+      return false; // No longer available
+    }
+    
+    return true; // Currently available
+  }
+
+  /// Get time until product becomes available (if not yet available)
+  Duration? get timeUntilAvailable {
+    if (!isLimitedTime || availableFrom == null) {
+      return null;
+    }
+    
+    final now = DateTime.now();
+    if (now.isBefore(availableFrom!)) {
+      return availableFrom!.difference(now);
+    }
+    
+    return null; // Already available or past availability
+  }
+
+  /// Get time until product expires (if currently available)
+  Duration? get timeUntilExpires {
+    if (!isLimitedTime || availableUntil == null) {
+      return null;
+    }
+    
+    final now = DateTime.now();
+    if (now.isBefore(availableUntil!)) {
+      return availableUntil!.difference(now);
+    }
+    
+    return null; // Already expired or no expiry
   }
 }

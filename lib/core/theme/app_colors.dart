@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Primary Colors
-  static const Color primaryColor = Color(0xFFE91E63); // Pink color matching Yabalash brand
-  static const Color primaryColorLight = Color(0xFFF48FB1);
-  static const Color primaryColorDark = Color(0xFFC2185B);
+  // Primary Colors - Yabalash Green
+  static const Color primaryColor = Color(0xFF3AAA35); // Yabalash brand green
+  static const Color primaryColorLight = Color(0xFF6BC267);
+  static const Color primaryColorDark = Color(0xFF2D8A2A);
   
   // Secondary Colors
   static const Color secondaryColor = Color(0xFF4CAF50); // Green for success states

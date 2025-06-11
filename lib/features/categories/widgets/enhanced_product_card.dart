@@ -165,7 +165,9 @@ class EnhancedProductCard extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.only(top: 4.h),
-      child: Row(
+      child: Wrap(
+        spacing: 6.w,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           RatingBarIndicator(
             rating: product.rating!,
@@ -176,7 +178,6 @@ class EnhancedProductCard extends StatelessWidget {
             itemCount: 5,
             itemSize: 14.sp,
           ),
-          SizedBox(width: 6.w),
           Text(
             product.rating!.toStringAsFixed(1),
             style: TextStyle(
@@ -200,7 +201,10 @@ class EnhancedProductCard extends StatelessWidget {
   }
 
   Widget _buildPriceSection(BuildContext context) {
-    return Row(
+    return Wrap(
+      spacing: 8.w,
+      runSpacing: 4.h,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         // Current price
         Text(
@@ -215,7 +219,6 @@ class EnhancedProductCard extends StatelessWidget {
         // Original price (if discounted)
         if (product.compareAtPrice != null &&
             product.compareAtPrice! > product.price) ...[
-          SizedBox(width: 8.w),
           Text(
             'AED ${product.compareAtPrice!.toStringAsFixed(0)}',
             style: TextStyle(
@@ -224,7 +227,6 @@ class EnhancedProductCard extends StatelessWidget {
               decoration: TextDecoration.lineThrough,
             ),
           ),
-          SizedBox(width: 8.w),
           Container(
             padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
             decoration: BoxDecoration(
@@ -492,6 +494,6 @@ class EnhancedProductCard extends StatelessWidget {
 
     // Placeholder implementation - you'll need to adapt this
     // based on your actual API response structure
-    return 'Restaurant Name'; // TODO: Get actual vendor name from API
+    return 'Restaurantdd Name'; // TODO: Get actual vendor name from API
   }
 }

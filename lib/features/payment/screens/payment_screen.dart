@@ -66,6 +66,63 @@ class _PaymentScreenState extends State<PaymentScreen> {
       return;
     }
     
+    // Check for delivery issues in delivery mode
+    final isPickupMode = cartProvider.deliveryMode == DeliveryMode.pickup;
+    if (!isPickupMode) {
+      bool hasDeliveryIssues = false;
+      for (var vendor in cartProvider.cartData!.products) {
+        if (vendor.isDeliverable == false) {
+          hasDeliveryIssues = true;
+          break;
+        }
+      }
+      
+      if (hasDeliveryIssues) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('The specific items are not deliverable to this address. Please remove the items or change the address.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
+        return;
+      }
+    }
+    
+    // Check for closed vendors
+    bool hasClosedVendors = false;
+    bool canScheduleOrder = false;
+    for (var vendor in cartProvider.cartData!.products) {
+      if (vendor.vendor?.isVendorClosed == 1 || vendor.vendor?.isVendorClosed == true) {
+        hasClosedVendors = true;
+        if (vendor.vendor?.closedStoreOrderScheduled == 1) {
+          canScheduleOrder = true;
+        }
+      }
+    }
+    
+    if (hasClosedVendors) {
+      if (!canScheduleOrder) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vendor is not accepting orders right now. Please go back to cart.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
+        return;
+      } else if (cartProvider.scheduleType == 'now') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please schedule your order for later as the vendor is currently closed.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 5),
+          ),
+        );
+        return;
+      }
+    }
+    
     // Set delivery instructions and order note
     paymentProvider.setDeliveryInstructions(_instructionsController.text);
     paymentProvider.setOrderNote(_noteController.text);

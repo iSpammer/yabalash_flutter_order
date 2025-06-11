@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import '../constants/api_constants.dart';
 import '../constants/app_constants.dart';
 import '../models/api_response.dart';
@@ -9,6 +11,8 @@ import '../models/api_response.dart';
 class ApiService {
   late final Dio _dio;
   static final ApiService _instance = ApiService._internal();
+  final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
+  String? _cachedDeviceId;
 
   factory ApiService() => _instance;
 
@@ -21,11 +25,25 @@ class ApiService {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          'code': ApiConstants.companyCode,
+          'language': '1',
         },
       ),
     );
 
     _dio.interceptors.addAll([
+      // Conditionally add logger based on request path
+      // InterceptorsWrapper(
+      //   onRequest: (options, handler) {
+      //     // Skip logging for /v2/homepage endpoint
+      //     if (!options.path.contains('/v2/homepage')) {
+      //       options.extra['skipLog'] = false;
+      //     } else {
+      //       options.extra['skipLog'] = true;
+      //     }
+      //     handler.next(options);
+      //   },
+      // ),
       PrettyDioLogger(
         requestHeader: true,
         requestBody: true,
@@ -33,6 +51,10 @@ class ApiService {
         responseHeader: false,
         error: true,
         compact: true,
+        // filter: (options, _) {
+        //   // Skip logging if marked
+        //   return options.extra['skipLog'] != true;
+        // },
       ),
       InterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -51,6 +73,22 @@ class ApiService {
           // Add additional headers that React Native app uses
           options.headers['currency'] = '1'; // Currency ID from curl example
           options.headers['freelancer'] = '0'; // Not freelancer mode
+
+          // Add device ID as systemuser header
+          final deviceId = await _getDeviceId();
+          if (deviceId != null) {
+            options.headers['systemuser'] = deviceId;
+          }
+
+          // Add location headers if available in query params
+          if (options.queryParameters.containsKey('latitude')) {
+            options.headers['latitude'] =
+                options.queryParameters['latitude'].toString();
+          }
+          if (options.queryParameters.containsKey('longitude')) {
+            options.headers['longitude'] =
+                options.queryParameters['longitude'].toString();
+          }
 
           handler.next(options);
         },
@@ -82,6 +120,36 @@ class ApiService {
     await prefs.remove(AppConstants.userDataKey);
     await prefs.remove(AppConstants.authTokenKey);
     // Navigation will be handled by the app
+  }
+
+  Future<String?> _getDeviceId() async {
+    // Use cached value if available
+    if (_cachedDeviceId != null) return _cachedDeviceId;
+
+    try {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        final androidInfo = await _deviceInfo.androidInfo;
+        _cachedDeviceId = androidInfo.id;
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+        final iosInfo = await _deviceInfo.iosInfo;
+        _cachedDeviceId = iosInfo.identifierForVendor ?? '';
+      } else {
+        // For web or other platforms, generate a unique ID
+        final prefs = await SharedPreferences.getInstance();
+        String? storedId = prefs.getString('device_id');
+        if (storedId == null) {
+          storedId = DateTime.now().millisecondsSinceEpoch.toString();
+          await prefs.setString('device_id', storedId);
+        }
+        _cachedDeviceId = storedId;
+      }
+    } catch (e) {
+      debugPrint('Error getting device ID: $e');
+      // Fallback to a default value
+      _cachedDeviceId = 'flutter_default_id';
+    }
+
+    return _cachedDeviceId;
   }
 
   Future<ApiResponse<T>> get<T>(
@@ -142,14 +210,19 @@ class ApiService {
       // For endpoints that return data directly at root level
       if (response.data is Map<String, dynamic>) {
         final responseData = response.data as Map<String, dynamic>;
-        
-        // Debug logging
-        print('PostDirect - Response data keys: ${responseData.keys}');
-        if (extractField != null) {
-          print('PostDirect - Looking for field: $extractField');
-          print('PostDirect - Field value: ${responseData[extractField]}');
-        }
-        
+
+        // Debug logging disabled for now
+        // if (kDebugMode) {
+        //   // ignore: avoid_print
+        //   print('PostDirect - Response data keys: ${responseData.keys}');
+        //   if (extractField != null) {
+        //     // ignore: avoid_print
+        //     print('PostDirect - Looking for field: $extractField');
+        //     // ignore: avoid_print
+        //     print('PostDirect - Field value: ${responseData[extractField]}');
+        //   }
+        // }
+
         // If we need to extract a specific field
         if (extractField != null && responseData.containsKey(extractField)) {
           return ApiResponse.success(
@@ -157,7 +230,7 @@ class ApiService {
             statusCode: response.statusCode,
           );
         }
-        
+
         // Return the whole response as data
         return ApiResponse.success(
           data: responseData as T,
@@ -234,6 +307,14 @@ class ApiService {
                     messageData['error']?.toString() ?? messageData.toString();
               } else {
                 message = messageData.toString();
+              }
+            } else if (responseData['error'] != null) {
+              // Handle the 'error' field that the API returns
+              final errorData = responseData['error'];
+              if (errorData is String) {
+                message = errorData;
+              } else {
+                message = errorData.toString();
               }
             } else {
               message = 'Server error occurred';

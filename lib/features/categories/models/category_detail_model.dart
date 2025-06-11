@@ -14,6 +14,10 @@ class CategoryDetailModel {
   final String? type;
   final int? productCount;
   final Map<String, dynamic>? meta;
+  final bool? canAddProducts;
+  final int? typeId;
+  final String? slug;
+  final String? shareLink;
 
   CategoryDetailModel({
     required this.id,
@@ -28,6 +32,10 @@ class CategoryDetailModel {
     this.type,
     this.productCount,
     this.meta,
+    this.canAddProducts,
+    this.typeId,
+    this.slug,
+    this.shareLink,
   });
 
   factory CategoryDetailModel.fromJson(Map<String, dynamic> json) {
@@ -35,11 +43,15 @@ class CategoryDetailModel {
     String? categoryName = json['name'];
     String? categoryDescription = json['description'];
     
-    if (categoryName == null && json['translation'] is List) {
-      final translations = json['translation'] as List;
-      if (translations.isNotEmpty && translations[0] is Map) {
-        categoryName = translations[0]['name'];
-        categoryDescription = translations[0]['description'];
+    // First check if name exists at root level
+    if (categoryName == null || categoryName.isEmpty) {
+      // Then check translation array
+      if (json['translation'] is List) {
+        final translations = json['translation'] as List;
+        if (translations.isNotEmpty && translations[0] is Map) {
+          categoryName = translations[0]['name'];
+          categoryDescription = translations[0]['description'] ?? categoryDescription;
+        }
       }
     }
     
@@ -99,7 +111,18 @@ class CategoryDetailModel {
       type: json['type']?.toString() ?? json['slug']?.toString(),
       productCount: productCountValue,
       meta: json['meta'] is Map<String, dynamic> ? json['meta'] : null,
+      canAddProducts: json['can_add_products'] == 1,
+      typeId: _parseInt(json['type_id']),
+      slug: json['slug']?.toString(),
+      shareLink: json['share_link']?.toString() ?? (json['slug'] != null ? 'https://yabalash.com/category/${json['slug']}' : null),
     );
+  }
+  
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
   Map<String, dynamic> toJson() {
@@ -116,6 +139,8 @@ class CategoryDetailModel {
       'type': type,
       'product_count': productCount,
       'meta': meta,
+      'can_add_products': canAddProducts,
+      'type_id': typeId,
     };
   }
 
@@ -129,24 +154,82 @@ class CategoryDetailModel {
 // Model for category products API response
 class CategoryProductsResponse {
   final List<Map<String, dynamic>> products;
+  final List<Map<String, dynamic>>? vendors; // For vendor categories
   final CategoryPagination pagination;
   final CategoryFilters? appliedFilters;
+  final bool isVendorCategory;
 
   CategoryProductsResponse({
     required this.products,
+    this.vendors,
     required this.pagination,
     this.appliedFilters,
+    this.isVendorCategory = false,
   });
 
   factory CategoryProductsResponse.fromJson(Map<String, dynamic> json) {
     final data = json['data'] ?? json;
     
+    // Handle the listData structure from category API
+    List<Map<String, dynamic>> productsList = [];
+    List<Map<String, dynamic>>? vendorsList;
+    Map<String, dynamic> paginationData = {};
+    bool isVendorCategory = false;
+    
+    if (data['listData'] != null) {
+      // This is the vendor category response structure
+      final listData = data['listData'];
+      final dataItems = List<Map<String, dynamic>>.from(listData['data'] ?? []);
+      
+      // Check the category type to determine if it's vendors or products
+      // From the API, type_id = 3 or redirect_to = "Vendor" means vendor category
+      if (data['category'] != null) {
+        final category = data['category'];
+        final typeId = category['type_id'];
+        final redirectTo = category['type']?['redirect_to']?.toString().toLowerCase();
+        
+        // type_id = 3 or redirect_to = "vendor" means it's a vendor category
+        if (typeId == 3 || redirectTo == 'vendor') {
+          isVendorCategory = true;
+          vendorsList = dataItems;
+        } else {
+          // Otherwise it's products
+          productsList = dataItems;
+        }
+      } else if (dataItems.isNotEmpty) {
+        // Fallback: Check if the first item looks like a vendor (has vendor-specific fields)
+        final firstItem = dataItems.first;
+        // Check for vendor-specific fields
+        if (firstItem.containsKey('address') || 
+            firstItem.containsKey('phone_no') ||
+            firstItem.containsKey('order_min_amount') ||
+            firstItem.containsKey('commission_percent') ||
+            firstItem.containsKey('delivery') ||
+            firstItem.containsKey('takeaway') ||
+            firstItem.containsKey('dine_in') ||
+            firstItem.containsKey('vendor_templete_id')) {
+          isVendorCategory = true;
+          vendorsList = dataItems;
+        } else {
+          productsList = dataItems;
+        }
+      }
+      
+      paginationData = listData;
+    } else {
+      // Regular product response structure
+      productsList = List<Map<String, dynamic>>.from(data['products'] ?? data['data'] ?? []);
+      paginationData = data['pagination'] ?? data;
+    }
+    
     return CategoryProductsResponse(
-      products: List<Map<String, dynamic>>.from(data['products'] ?? data['data'] ?? []),
-      pagination: CategoryPagination.fromJson(data['pagination'] ?? {}),
+      products: productsList,
+      vendors: vendorsList,
+      pagination: CategoryPagination.fromJson(paginationData),
       appliedFilters: data['filters'] != null 
           ? CategoryFilters.fromJson(data['filters']) 
           : null,
+      isVendorCategory: isVendorCategory,
     );
   }
 }

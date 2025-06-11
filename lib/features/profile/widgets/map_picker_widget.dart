@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../../core/services/google_maps_service.dart';
 
 class MapPickerWidget extends StatefulWidget {
   final double? initialLatitude;
   final double? initialLongitude;
-  final Function(double latitude, double longitude, String? address) onLocationSelected;
+  final Function(double latitude, double longitude, String? address, {Map<String, String>? parsedAddress}) onLocationSelected;
 
   const MapPickerWidget({
     super.key,
@@ -98,10 +99,28 @@ class _MapPickerWidgetState extends State<MapPickerWidget> {
         ),
       );
 
+      // Get address from coordinates using Google Geocoding
+      String address = 'Current Location';
+      Map<String, String>? parsedAddress;
+      try {
+        final geocodingResponse = await GoogleMapsService.reverseGeocode(
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+        
+        if (geocodingResponse != null && geocodingResponse.results.isNotEmpty) {
+          address = geocodingResponse.results.first.formattedAddress;
+          parsedAddress = _parseAddressComponents(geocodingResponse.results.first);
+        }
+      } catch (e) {
+        // If geocoding fails, continue with default address
+        debugPrint('Error getting address from coordinates: $e');
+      }
+
       setState(() {
         _selectedLatitude = position.latitude;
         _selectedLongitude = position.longitude;
-        _selectedAddress = 'Current Location';
+        _selectedAddress = address;
         _isLoading = false;
       });
 
@@ -110,6 +129,7 @@ class _MapPickerWidgetState extends State<MapPickerWidget> {
         position.latitude,
         position.longitude,
         _selectedAddress,
+        parsedAddress: parsedAddress,
       );
 
       if (!mounted) return;
@@ -131,6 +151,136 @@ class _MapPickerWidgetState extends State<MapPickerWidget> {
         ),
       );
     }
+  }
+
+  Map<String, String> _parseAddressComponents(GoogleGeocodingResult result) {
+    final parsed = <String, String>{};
+    
+    for (final component in result.addressComponents) {
+      final types = component.types;
+      
+      // Street number
+      if (types.contains('street_number')) {
+        parsed['street_number'] = component.longName;
+      }
+      
+      // Street name/route
+      if (types.contains('route')) {
+        parsed['route'] = component.longName;
+      }
+      
+      // Building/premise
+      if (types.contains('premise') || types.contains('establishment')) {
+        parsed['building'] = component.longName;
+      }
+      
+      // Subpremise (apartment/unit)
+      if (types.contains('subpremise')) {
+        parsed['apartment'] = component.longName;
+      }
+      
+      // Floor level
+      if (types.contains('floor')) {
+        parsed['floor'] = component.longName;
+      }
+      
+      // Neighborhood/Area (multiple levels for better coverage)
+      if (types.contains('neighborhood') || 
+          types.contains('sublocality_level_1') || 
+          types.contains('sublocality_level_2') ||
+          types.contains('sublocality') ||
+          types.contains('political')) {
+        if (!parsed.containsKey('area')) { // Only set if not already set
+          parsed['area'] = component.longName;
+        }
+      }
+      
+      // Landmark (point of interest)
+      if (types.contains('point_of_interest') || types.contains('establishment')) {
+        if (!parsed.containsKey('landmark')) { // Only set if not already set
+          parsed['landmark'] = component.longName;
+        }
+      }
+      
+      // City (multiple possible types)
+      if (types.contains('locality') || 
+          types.contains('administrative_area_level_2') ||
+          types.contains('administrative_area_level_3')) {
+        if (!parsed.containsKey('city')) { // Prefer locality over admin areas
+          parsed['city'] = component.longName;
+        }
+      }
+      
+      // State/Emirate
+      if (types.contains('administrative_area_level_1')) {
+        parsed['state'] = component.longName;
+      }
+      
+      // Country
+      if (types.contains('country')) {
+        parsed['country'] = component.longName;
+      }
+      
+      // Postal code (though not used in UAE)
+      if (types.contains('postal_code')) {
+        parsed['postal_code'] = component.longName;
+      }
+    }
+    
+    // Build comprehensive street address from components
+    final streetParts = <String>[];
+    
+    if (parsed.containsKey('street_number')) {
+      streetParts.add(parsed['street_number']!);
+    }
+    
+    if (parsed.containsKey('route')) {
+      streetParts.add(parsed['route']!);
+    }
+    
+    // If no street components found, try to use area or landmark
+    if (streetParts.isEmpty) {
+      if (parsed.containsKey('area')) {
+        streetParts.add(parsed['area']!);
+      } else if (parsed.containsKey('landmark')) {
+        streetParts.add(parsed['landmark']!);
+      }
+    }
+    
+    if (streetParts.isNotEmpty) {
+      parsed['street'] = streetParts.join(' ');
+    }
+    
+    // Fallback for missing city - use area if city is not found
+    if (!parsed.containsKey('city') && parsed.containsKey('area')) {
+      parsed['city'] = parsed['area']!;
+    }
+    
+    // Fallback for missing state - common UAE emirates
+    if (!parsed.containsKey('state') && parsed.containsKey('country')) {
+      if (parsed['country']!.toLowerCase().contains('united arab emirates') || 
+          parsed['country']!.toLowerCase().contains('uae')) {
+        // Try to infer emirate from city
+        final city = parsed['city']?.toLowerCase() ?? '';
+        if (city.contains('dubai')) {
+          parsed['state'] = 'Dubai';
+        } else if (city.contains('abu dhabi')) {
+          parsed['state'] = 'Abu Dhabi';
+        } else if (city.contains('sharjah')) {
+          parsed['state'] = 'Sharjah';
+        } else if (city.contains('ajman')) {
+          parsed['state'] = 'Ajman';
+        } else if (city.contains('umm al quwain') || city.contains('umm al-quwain')) {
+          parsed['state'] = 'Umm Al Quwain';
+        } else if (city.contains('ras al khaimah') || city.contains('ras al-khaimah')) {
+          parsed['state'] = 'Ras Al Khaimah';
+        } else if (city.contains('fujairah')) {
+          parsed['state'] = 'Fujairah';
+        }
+      }
+    }
+    
+    return parsed;
   }
 
   void _openMapPicker() {

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../theme/app_typography.dart';
+
+enum ButtonSize { small, medium, large }
 
 class CustomButton extends StatelessWidget {
   final String text;
@@ -13,9 +16,10 @@ class CustomButton extends StatelessWidget {
   final BorderRadiusGeometry? borderRadius;
   final Widget? icon;
   final bool outlined;
+  final ButtonSize size;
 
   const CustomButton({
-    Key? key,
+    super.key,
     required this.text,
     required this.onPressed,
     this.isLoading = false,
@@ -27,17 +31,35 @@ class CustomButton extends StatelessWidget {
     this.borderRadius,
     this.icon,
     this.outlined = false,
-  }) : super(key: key);
+    this.size = ButtonSize.medium,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bgColor = backgroundColor ?? theme.primaryColor;
     final txtColor = textColor ?? (outlined ? bgColor : Colors.white);
+    
+    // Determine height and font size based on size
+    late final double buttonHeight;
+    late final double buttonFontSize;
+    switch (size) {
+      case ButtonSize.small:
+        buttonHeight = height ?? 36.h;
+        buttonFontSize = 14.sp;
+        break;
+      case ButtonSize.large:
+        buttonHeight = height ?? 60.h;
+        buttonFontSize = 18.sp;
+        break;
+      case ButtonSize.medium:
+        buttonHeight = height ?? 50.h;
+        buttonFontSize = 16.sp;
+    }
 
     return SizedBox(
-      width: width ?? double.infinity,
-      height: height ?? 50.h,
+      width: width,
+      height: buttonHeight,
       child: outlined
           ? OutlinedButton(
               onPressed: isLoading ? null : onPressed,
@@ -49,7 +71,7 @@ class CustomButton extends StatelessWidget {
                 ),
                 padding: padding ?? EdgeInsets.symmetric(horizontal: 16.w),
               ),
-              child: _buildChild(txtColor),
+              child: _buildChild(txtColor, buttonFontSize),
             )
           : ElevatedButton(
               onPressed: isLoading ? null : onPressed,
@@ -62,12 +84,12 @@ class CustomButton extends StatelessWidget {
                 padding: padding ?? EdgeInsets.symmetric(horizontal: 16.w),
                 elevation: 0,
               ),
-              child: _buildChild(txtColor),
+              child: _buildChild(txtColor, buttonFontSize),
             ),
     );
   }
 
-  Widget _buildChild(Color txtColor) {
+  Widget _buildChild(Color txtColor, double fontSize) {
     if (isLoading) {
       return SizedBox(
         height: 20.h,
@@ -87,9 +109,8 @@ class CustomButton extends StatelessWidget {
           SizedBox(width: 8.w),
           Text(
             text,
-            style: TextStyle(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w600,
+            style: AppTypography.button.copyWith(
+              fontSize: fontSize,
               color: txtColor,
             ),
           ),
@@ -99,9 +120,8 @@ class CustomButton extends StatelessWidget {
 
     return Text(
       text,
-      style: TextStyle(
-        fontSize: 16.sp,
-        fontWeight: FontWeight.w600,
+      style: AppTypography.button.copyWith(
+        fontSize: fontSize,
         color: txtColor,
       ),
     );

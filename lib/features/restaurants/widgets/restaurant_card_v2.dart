@@ -35,7 +35,9 @@ class RestaurantCardV2 extends StatelessWidget {
             ),
           ],
         ),
-        child: isHorizontal ? _buildHorizontalCard(context) : _buildVerticalCard(context),
+        child: isHorizontal
+            ? _buildHorizontalCard(context)
+            : _buildVerticalCard(context),
       ),
     );
   }
@@ -116,22 +118,24 @@ class RestaurantCardV2 extends StatelessWidget {
     );
   }
 
-  Widget _buildRestaurantImage({required double width, required double height}) {
+  Widget _buildRestaurantImage(
+      {required double width, required double height}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12.r),
       child: Stack(
         children: [
           // Main banner image (full background)
           _buildBannerImage(width, height),
-          
+
           // Logo overlay in bottom-left corner
           if (restaurant.logo != null && restaurant.logo!.isNotEmpty)
             _buildLogoOverlay(),
-          
+
           // Promo code display in top-left corner
-          if (restaurant.promoDiscount != null && restaurant.promoDiscount!.isNotEmpty)
+          if (restaurant.promoDiscount != null &&
+              restaurant.promoDiscount!.isNotEmpty)
             _buildPromoCodeBadge(),
-          
+
           // Gradient overlay for better text visibility
           Container(
             width: width,
@@ -147,7 +151,7 @@ class RestaurantCardV2 extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // Closed overlay if restaurant is closed
           if (isRestaurantClosed)
             Container(
@@ -158,7 +162,7 @@ class RestaurantCardV2 extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12.r),
               ),
             ),
-          
+
           // Availability badge in top-right corner
           Positioned(
             top: 8.h,
@@ -169,11 +173,12 @@ class RestaurantCardV2 extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildBannerImage(double width, double height) {
     // Prioritize banner for visual appeal, fall back to main image, then logo
-    String? bannerUrl = restaurant.banner ?? restaurant.image ?? restaurant.logo;
-    
+    String? bannerUrl =
+        restaurant.banner ?? restaurant.image ?? restaurant.logo;
+
     return CachedNetworkImage(
       imageUrl: bannerUrl ?? '',
       width: width,
@@ -251,7 +256,7 @@ class RestaurantCardV2 extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildLogoOverlay() {
     return Positioned(
       bottom: 8.h,
@@ -308,7 +313,7 @@ class RestaurantCardV2 extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildPromoCodeBadge() {
     return Positioned(
       top: 8.h,
@@ -359,8 +364,9 @@ class RestaurantCardV2 extends StatelessWidget {
     String? promoText;
     Color promoColor = Colors.red;
     IconData promoIcon = Icons.local_offer;
-    
-    if (restaurant.promoDiscount != null && restaurant.promoDiscount!.isNotEmpty) {
+
+    if (restaurant.promoDiscount != null &&
+        restaurant.promoDiscount!.isNotEmpty) {
       promoText = restaurant.promoDiscount!.toUpperCase();
       promoColor = Colors.red;
       promoIcon = Icons.local_offer;
@@ -369,11 +375,11 @@ class RestaurantCardV2 extends StatelessWidget {
       promoColor = Colors.purple;
       promoIcon = Icons.star;
     }
-    
+
     if (promoText == null) {
       return const SizedBox.shrink();
     }
-    
+
     return Positioned(
       top: 8.h,
       left: 8.w,
@@ -381,7 +387,7 @@ class RestaurantCardV2 extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: promoColor == Colors.red 
+            colors: promoColor == Colors.red
                 ? [Colors.red[400]!, Colors.pink[500]!]
                 : [Colors.purple[400]!, Colors.indigo[500]!],
             begin: Alignment.topLeft,
@@ -444,20 +450,24 @@ class RestaurantCardV2 extends StatelessWidget {
                   SizedBox(height: 4.h),
                   Row(
                     children: [
-                      if (restaurant.rating != null && restaurant.rating! > 0) ...[
+                      if (restaurant.rating != null &&
+                          restaurant.rating! > 0) ...[
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 8.w, vertical: 4.h),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
                                 _getRatingColor(restaurant.rating!),
-                                _getRatingColor(restaurant.rating!).withOpacity(0.8),
+                                _getRatingColor(restaurant.rating!)
+                                    .withOpacity(0.8),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(8.r),
                             boxShadow: [
                               BoxShadow(
-                                color: _getRatingColor(restaurant.rating!).withOpacity(0.3),
+                                color: _getRatingColor(restaurant.rating!)
+                                    .withOpacity(0.3),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -480,7 +490,8 @@ class RestaurantCardV2 extends StatelessWidget {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              if (restaurant.reviewCount != null && restaurant.reviewCount! > 0) ...[
+                              if (restaurant.reviewCount != null &&
+                                  restaurant.reviewCount! > 0) ...[
                                 SizedBox(width: 4.w),
                                 Text(
                                   '(${restaurant.reviewCount})',
@@ -501,7 +512,9 @@ class RestaurantCardV2 extends StatelessWidget {
                           _getCuisinesText(),
                           style: TextStyle(
                             fontSize: 13.sp,
-                            color: isRestaurantClosed ? Colors.grey[400] : Colors.grey[700],
+                            color: isRestaurantClosed
+                                ? Colors.grey[400]
+                                : Colors.grey[700],
                             fontWeight: FontWeight.w500,
                           ),
                           maxLines: 1,
@@ -510,6 +523,24 @@ class RestaurantCardV2 extends StatelessWidget {
                       ),
                     ],
                   ),
+                  // Add description if available and horizontal view
+                  if (restaurant.description != null &&
+                      restaurant.description!.isNotEmpty &&
+                      isHorizontal) ...[
+                    SizedBox(height: 4.h),
+                    Text(
+                      restaurant.description!,
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: isRestaurantClosed
+                            ? Colors.grey[400]
+                            : Colors.grey[600],
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -526,7 +557,9 @@ class RestaurantCardV2 extends StatelessWidget {
         // First row: Delivery info with enhanced design
         Container(
           padding: EdgeInsets.symmetric(vertical: 8.h),
-          child: Row(
+          child: Wrap(
+            spacing: 8.w,
+            runSpacing: 4.h,
             children: [
               if (restaurant.formattedDistance != null) ...[
                 _buildInfoChip(
@@ -535,7 +568,6 @@ class RestaurantCardV2 extends StatelessWidget {
                   iconColor: Colors.blue[600]!,
                   backgroundColor: Colors.blue[50]!,
                 ),
-                SizedBox(width: 8.w),
               ],
               if (restaurant.formattedDeliveryTime != null) ...[
                 _buildInfoChip(
@@ -544,12 +576,13 @@ class RestaurantCardV2 extends StatelessWidget {
                   iconColor: Colors.orange[600]!,
                   backgroundColor: Colors.orange[50]!,
                 ),
-                SizedBox(width: 8.w),
               ],
-              if (restaurant.minimumOrderAmount != null && restaurant.minimumOrderAmount! > 0) ...[
+              if (restaurant.minimumOrderAmount != null &&
+                  restaurant.minimumOrderAmount! > 0) ...[
                 _buildInfoChip(
                   icon: Icons.shopping_basket_rounded,
-                  text: 'Min AED ${restaurant.minimumOrderAmount!.toStringAsFixed(0)}',
+                  text:
+                      'Min AED ${restaurant.minimumOrderAmount!.toStringAsFixed(0)}',
                   iconColor: Colors.purple[600]!,
                   backgroundColor: Colors.purple[50]!,
                 ),
@@ -557,7 +590,7 @@ class RestaurantCardV2 extends StatelessWidget {
             ],
           ),
         ),
-        
+
         // Delivery fee badge with enhanced design
         if (restaurant.deliveryFee != null) ...[
           Container(
@@ -565,18 +598,20 @@ class RestaurantCardV2 extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: restaurant.deliveryFee == 0 
+                colors: restaurant.deliveryFee == 0
                     ? [Colors.green[400]!, Colors.green[600]!]
                     : [Colors.grey[100]!, Colors.grey[200]!],
               ),
               borderRadius: BorderRadius.circular(12.r),
-              boxShadow: restaurant.deliveryFee == 0 ? [
-                BoxShadow(
-                  color: Colors.green.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ] : null,
+              boxShadow: restaurant.deliveryFee == 0
+                  ? [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -584,16 +619,20 @@ class RestaurantCardV2 extends StatelessWidget {
                 Icon(
                   Icons.delivery_dining_rounded,
                   size: 16.sp,
-                  color: restaurant.deliveryFee == 0 ? Colors.white : Colors.grey[700],
+                  color: restaurant.deliveryFee == 0
+                      ? Colors.white
+                      : Colors.grey[700],
                 ),
                 SizedBox(width: 6.w),
                 Text(
-                  restaurant.deliveryFee == 0 
-                      ? 'FREE DELIVERY' 
+                  restaurant.deliveryFee == 0
+                      ? 'FREE DELIVERY'
                       : 'AED ${restaurant.deliveryFee!.toStringAsFixed(0)} Delivery',
                   style: TextStyle(
                     fontSize: 12.sp,
-                    color: restaurant.deliveryFee == 0 ? Colors.white : Colors.grey[700],
+                    color: restaurant.deliveryFee == 0
+                        ? Colors.white
+                        : Colors.grey[700],
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
                   ),
@@ -602,16 +641,17 @@ class RestaurantCardV2 extends StatelessWidget {
             ),
           ),
         ],
-        
+
         // Special features row
-        if (restaurant.promoDiscount != null || 
-            restaurant.isPureVeg == true || 
+        if (restaurant.promoDiscount != null ||
+            restaurant.isPureVeg == true ||
             (restaurant.tags != null && restaurant.tags!.isNotEmpty)) ...[
           Wrap(
             spacing: 6.w,
             runSpacing: 6.h,
             children: [
-              if (restaurant.promoDiscount != null && restaurant.promoDiscount!.isNotEmpty)
+              if (restaurant.promoDiscount != null &&
+                  restaurant.promoDiscount!.isNotEmpty)
                 _buildFeatureBadge(
                   icon: Icons.local_offer_rounded,
                   text: restaurant.promoDiscount!.toUpperCase(),
@@ -689,7 +729,9 @@ class RestaurantCardV2 extends StatelessWidget {
         color: isRestaurantClosed ? Colors.grey[100] : backgroundColor,
         borderRadius: BorderRadius.circular(20.r),
         border: Border.all(
-          color: isRestaurantClosed ? Colors.grey[300]! : backgroundColor.withOpacity(0.5),
+          color: isRestaurantClosed
+              ? Colors.grey[300]!
+              : backgroundColor.withOpacity(0.5),
           width: 1,
         ),
       ),
@@ -717,19 +759,20 @@ class RestaurantCardV2 extends StatelessWidget {
 
   Widget _buildAvailabilityBadge() {
     if (restaurant.isOpen == null) return const SizedBox.shrink();
-    
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: restaurant.isOpen! 
+          colors: restaurant.isOpen!
               ? [Colors.green[400]!, Colors.green[600]!]
               : [Colors.red[400]!, Colors.red[600]!],
         ),
         borderRadius: BorderRadius.circular(16.r),
         boxShadow: [
           BoxShadow(
-            color: (restaurant.isOpen! ? Colors.green : Colors.red).withOpacity(0.3),
+            color: (restaurant.isOpen! ? Colors.green : Colors.red)
+                .withOpacity(0.3),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -845,12 +888,13 @@ class RestaurantCardV2 extends StatelessWidget {
     if (restaurant.isDeliveryAvailable == true) services.add('Delivery');
     return services.isNotEmpty ? services.join(' • ') : 'Available';
   }
-  
+
   Widget _buildPositionedBadges() {
     return Stack(
       children: [
         // Promo discount in top-left
-        if (restaurant.promoDiscount != null && restaurant.promoDiscount!.isNotEmpty)
+        if (restaurant.promoDiscount != null &&
+            restaurant.promoDiscount!.isNotEmpty)
           Positioned(
             top: 8.h,
             left: 8.w,
@@ -891,14 +935,14 @@ class RestaurantCardV2 extends StatelessWidget {
               ),
             ),
           ),
-        
+
         // Availability badge in top-right
         Positioned(
           top: 8.h,
           right: 8.w,
           child: _buildAvailabilityBadge(),
         ),
-        
+
         // Additional tags below promo (if space allows)
         if (restaurant.tags != null && restaurant.tags!.isNotEmpty)
           Positioned(
@@ -930,12 +974,13 @@ class RestaurantCardV2 extends StatelessWidget {
       ],
     );
   }
-  
+
   Widget _buildVerticalPositionedBadges() {
     return Stack(
       children: [
         // Promo discount in top-left
-        if (restaurant.promoDiscount != null && restaurant.promoDiscount!.isNotEmpty)
+        if (restaurant.promoDiscount != null &&
+            restaurant.promoDiscount!.isNotEmpty)
           Positioned(
             top: 8.h,
             left: 8.w,
@@ -976,21 +1021,21 @@ class RestaurantCardV2 extends StatelessWidget {
               ),
             ),
           ),
-        
+
         // Availability badge in top-right
         Positioned(
           top: 8.h,
           right: 8.w,
           child: _buildAvailabilityBadge(),
         ),
-        
+
         // Logo overlay in bottom-left
         if (restaurant.logo != null && restaurant.logo!.isNotEmpty)
           _buildLogoOverlay(),
       ],
     );
   }
-  
+
   Widget _buildCardBannerBackground() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16.r),
@@ -998,7 +1043,7 @@ class RestaurantCardV2 extends StatelessWidget {
         children: [
           // Full card banner background
           _buildBannerImage(double.infinity, double.infinity),
-          
+
           // Gradient overlay for readability
           Container(
             decoration: BoxDecoration(
@@ -1012,7 +1057,7 @@ class RestaurantCardV2 extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // Subtle pattern overlay
           Container(
             decoration: BoxDecoration(
@@ -1030,10 +1075,10 @@ class RestaurantCardV2 extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildRestaurantLogo({required double width, required double height}) {
     String? logoUrl = restaurant.logo ?? restaurant.image;
-    
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12.r),

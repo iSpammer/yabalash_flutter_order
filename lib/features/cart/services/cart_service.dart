@@ -75,10 +75,13 @@ class CartService {
     int? productId, // Add product ID parameter
   }) async {
     try {
+      // Convert pickup to takeaway for API compatibility
+      final apiType = type == 'pickup' ? 'takeaway' : type;
+      
       final Map<String, dynamic> data = {
         'sku': sku,
         'quantity': quantity,
-        'type': type,
+        'type': apiType,
       };
 
       if (productVariantId != null) {
@@ -93,7 +96,7 @@ class CartService {
       debugPrint('=== ADD TO CART REQUEST DATA ===');
       debugPrint('SKU: $sku');
       debugPrint('Quantity: $quantity');
-      debugPrint('Type: $type');
+      debugPrint('Type: $type (API type: $apiType)');
       debugPrint('Product ID: $productId');
       debugPrint('Product Variant ID: $productVariantId');
       debugPrint('Full data: $data');
@@ -201,12 +204,27 @@ class CartService {
   }
 
   // 2. ✅ Get Cart List
-  Future<ApiResponse<CartModel>> getCartDetail({String type = 'delivery'}) async {
+  Future<ApiResponse<CartModel>> getCartDetail({
+    String type = 'delivery',
+    int? addressId,
+  }) async {
     try {
+      // Convert pickup to takeaway for API compatibility
+      final apiType = type == 'pickup' ? 'takeaway' : type;
+      
       final headers = await _getHeaders();
 
+      // Build query parameters
+      String queryParams = '?type=$apiType';
+      if (addressId != null) {
+        queryParams += '&address_id=$addressId';
+      }
+
+      debugPrint('Cart API URL: ${ApiConstants.cartList}$queryParams');
+      debugPrint('Cart API Headers: $headers');
+
       final responseFromApiService = await _apiService.get(
-        '${ApiConstants.cartList}?type=$type',
+        '${ApiConstants.cartList}$queryParams',
         headers: headers,
       );
 
@@ -272,6 +290,9 @@ class CartService {
     String type = 'delivery',
   }) async {
     try {
+      // Convert pickup to takeaway for API compatibility
+      final apiType = type == 'pickup' ? 'takeaway' : type;
+      
       final headers = await _getHeaders();
 
       final response = await _apiService.post(
@@ -280,7 +301,7 @@ class CartService {
           'cart_id': cartId,
           'cart_product_id': cartProductId,
           'quantity': quantity,
-          'type': type,
+          'type': apiType,
         },
         headers: headers,
       );
@@ -559,6 +580,9 @@ class CartService {
     String type = 'delivery',
   }) async {
     try {
+      // Convert pickup to takeaway for API compatibility
+      final apiType = type == 'pickup' ? 'takeaway' : type;
+      
       final headers = await _getHeaders();
 
       final response = await _apiService.post(
@@ -566,7 +590,7 @@ class CartService {
         data: {
           'cart_id': cartId,
           'cart_product_id': cartProductId,
-          'type': type,
+          'type': apiType,
         },
         headers: headers,
       );

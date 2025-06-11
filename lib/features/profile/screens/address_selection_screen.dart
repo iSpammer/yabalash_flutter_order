@@ -14,6 +14,8 @@ class AddressSelectionScreen extends StatefulWidget {
 }
 
 class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
+  bool _isSelectingAddress = false;
+
   @override
   void initState() {
     super.initState();
@@ -25,24 +27,62 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
     });
   }
 
-  void _selectAddress(AddressModel address) {
-    final cartProvider = context.read<CartProvider>();
-    final addressProvider = context.read<AddressProvider>();
+  void _selectAddress(AddressModel address) async {
+    if (_isSelectingAddress) return; // Prevent multiple calls
     
-    // Set selected address in address provider
-    addressProvider.selectAddress(address);
-    
-    // If address has numeric ID, use it for cart provider
-    if (address.numericId != null) {
-      cartProvider.setDeliveryAddress(address.numericId!);
+    setState(() {
+      _isSelectingAddress = true;
+    });
+
+    try {
+      final cartProvider = context.read<CartProvider>();
+      final addressProvider = context.read<AddressProvider>();
+      
+      // Set selected address in address provider first
+      addressProvider.selectAddress(address);
+      
+      // Set as primary address on backend (crucial for delivery validation)
+      if (address.numericId != null) {
+        // Call setPrimaryAddress API
+        await addressProvider.setAddressAsPrimary(address.numericId!);
+        
+        // Set delivery address in cart provider
+        cartProvider.setDeliveryAddress(address.numericId!);
+        
+        // Wait for backend to process the primary address change
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Reload cart to check deliverability for new address
+        await cartProvider.loadCart();
+      }
+      
+      if (!mounted) return;
+      context.pop();
+    } catch (e) {
+      // Handle error but still allow user to go back
+      debugPrint('Error selecting address: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update address: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSelectingAddress = false;
+        });
+      }
     }
-    
-    context.pop();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return Stack(
+      children: [
+        Scaffold(
       appBar: AppBar(
         title: Text(
           'Select Address',
@@ -272,6 +312,46 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
           );
         },
       ),
+    ),
+        
+        // Loading overlay
+        if (_isSelectingAddress)
+          Container(
+            color: Colors.black.withOpacity(0.5),
+            child: Center(
+              child: Container(
+                padding: EdgeInsets.all(24.w),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    SizedBox(height: 16.h),
+                    Text(
+                      'Updating address...',
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    SizedBox(height: 8.h),
+                    Text(
+                      'This may take a few seconds',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

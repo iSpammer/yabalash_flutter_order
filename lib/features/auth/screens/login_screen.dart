@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -13,7 +14,7 @@ import '../widgets/animated_text_field.dart';
 import '../widgets/animated_auth_button.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -24,12 +25,12 @@ class _LoginScreenState extends State<LoginScreen>
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   String _selectedCountryCode = AppConstants.defaultCountryCode;
   String _selectedDialCode = AppConstants.defaultDialCode;
   bool _isPhoneLogin = false;
   bool _showPassword = false;
-  
+
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
@@ -39,18 +40,18 @@ class _LoginScreenState extends State<LoginScreen>
   void initState() {
     super.initState();
     _loadRememberMeData();
-    
+
     // Initialize animations
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-    
+
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -58,7 +59,7 @@ class _LoginScreenState extends State<LoginScreen>
       parent: _fadeController,
       curve: Curves.easeIn,
     ));
-    
+
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
@@ -66,12 +67,12 @@ class _LoginScreenState extends State<LoginScreen>
       parent: _slideController,
       curve: Curves.easeOutCubic,
     ));
-    
+
     // Start animations
     _fadeController.forward();
     _slideController.forward();
   }
-  
+
   @override
   void dispose() {
     _usernameController.dispose();
@@ -80,18 +81,22 @@ class _LoginScreenState extends State<LoginScreen>
     _slideController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _loadRememberMeData() async {
     final authProvider = context.read<AuthProvider>();
     final savedData = await authProvider.getRememberMeCredentials();
-    
-    if (savedData != null && savedData['username'] != null && savedData['password'] != null) {
+
+    if (savedData != null &&
+        savedData['username'] != null &&
+        savedData['password'] != null) {
       setState(() {
         _usernameController.text = savedData['username'];
         _passwordController.text = savedData['password'];
         _isPhoneLogin = savedData['isPhone'] ?? false;
-        _selectedDialCode = savedData['dialCode'] ?? AppConstants.defaultDialCode;
-        _selectedCountryCode = savedData['countryCode'] ?? AppConstants.defaultCountryCode;
+        _selectedDialCode =
+            savedData['dialCode'] ?? AppConstants.defaultDialCode;
+        _selectedCountryCode =
+            savedData['countryCode'] ?? AppConstants.defaultCountryCode;
       });
     }
   }
@@ -130,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _handleSocialLogin(String provider) async {
     try {
       Map<String, dynamic>? socialData;
-      
+
       switch (provider) {
         case 'google':
           socialData = await SocialLoginService().signInWithGoogle();
@@ -142,20 +147,40 @@ class _LoginScreenState extends State<LoginScreen>
           socialData = await SocialLoginService().signInWithApple();
           break;
       }
-      
+
       if (socialData != null && mounted) {
         final authProvider = context.read<AuthProvider>();
+
+        // First attempt social login without phone number
         final success = await authProvider.socialLogin(
           provider: provider,
           socialData: socialData,
         );
-        
+
         if (success && mounted) {
-          context.go('/home');
+          // Debug logging
+          debugPrint('Social login success');
+          debugPrint('User phone: ${authProvider.user?.phoneNumber}');
+          debugPrint(
+              'Phone required flag: ${authProvider.user?.phoneNumberRequired}');
+
+          // Check if phone number is required (either by flag or if phone is empty)
+          final phoneIsEmpty = authProvider.user?.phoneNumber == null ||
+              authProvider.user!.phoneNumber!.isEmpty;
+
+          debugPrint('Phone is empty: $phoneIsEmpty');
+
+          // Let the router redirect handle navigation based on phone number requirement
+          if (authProvider.user?.phoneNumberRequired == true || phoneIsEmpty) {
+            debugPrint('Phone number required - router will redirect to social phone screen');
+          } else {
+            debugPrint('Phone number not required - navigating to home');
+            context.go('/home');
+          }
         }
       } else {
         Fluttertoast.showToast(
-          msg: 'Social login cancelled or failed',
+          msg: 'Social login cancelled',
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
         );
@@ -172,12 +197,12 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     return AnimatedAuthBackground(
-      child: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: SingleChildScrollView(
+            child: SafeArea(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(horizontal: 24.w),
               child: Form(
                 key: _formKey,
@@ -185,7 +210,7 @@ class _LoginScreenState extends State<LoginScreen>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(height: 60.h),
-                    
+
                     // Logo and Title with animation
                     TweenAnimationBuilder<double>(
                       duration: const Duration(milliseconds: 1200),
@@ -197,31 +222,52 @@ class _LoginScreenState extends State<LoginScreen>
                             opacity: value,
                             child: Column(
                               children: [
-                                Container(
-                                  width: 100.w,
-                                  height: 100.w,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Theme.of(context).primaryColor,
-                                        Theme.of(context).primaryColor.withValues(alpha: 0.7),
+                                Hero(
+                                  tag: 'app_logo',
+                                  child: Container(
+                                    width: 100.w,
+                                    height: 100.w,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(20.r),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.1),
+                                          blurRadius: 15,
+                                          offset: const Offset(0, 5),
+                                        ),
                                       ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
                                     ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
-                                        blurRadius: 30,
-                                        offset: const Offset(0, 15),
+                                    child: Container(
+                                      padding: EdgeInsets.all(8.w),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(20.r),
+                                        color: Colors.white,
                                       ),
-                                    ],
-                                  ),
-                                  child: Icon(
-                                    Icons.restaurant_menu,
-                                    size: 50.sp,
-                                    color: Colors.white,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12.r),
+                                        child: Image.asset(
+                                          'assets/icon/app_icon.png',
+                                          width: 84.w,
+                                          height: 84.w,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              width: 84.w,
+                                              height: 84.w,
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context).primaryColor,
+                                                borderRadius: BorderRadius.circular(12.r),
+                                              ),
+                                              child: Icon(
+                                                Icons.restaurant_menu,
+                                                size: 42.sp,
+                                                color: Colors.white,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 SizedBox(height: 24.h),
@@ -249,9 +295,9 @@ class _LoginScreenState extends State<LoginScreen>
                         );
                       },
                     ),
-                    
+
                     SizedBox(height: 50.h),
-                    
+
                     // Email/Phone field
                     Row(
                       children: [
@@ -284,10 +330,16 @@ class _LoginScreenState extends State<LoginScreen>
                         Expanded(
                           child: AnimatedTextField(
                             controller: _usernameController,
-                            hintText: _isPhoneLogin ? 'Phone number' : 'Email or Phone',
+                            hintText: _isPhoneLogin
+                                ? 'Phone number'
+                                : 'Email or Phone',
                             labelText: _isPhoneLogin ? 'Phone' : 'Email/Phone',
-                            prefixIcon: _isPhoneLogin ? Icons.phone : Icons.person_outline,
-                            keyboardType: _isPhoneLogin ? TextInputType.phone : TextInputType.emailAddress,
+                            prefixIcon: _isPhoneLogin
+                                ? Icons.phone
+                                : Icons.person_outline,
+                            keyboardType: _isPhoneLogin
+                                ? TextInputType.phone
+                                : TextInputType.emailAddress,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter your ${_isPhoneLogin ? 'phone number' : 'email or phone'}';
@@ -304,9 +356,9 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                       ],
                     ),
-                    
+
                     SizedBox(height: 20.h),
-                    
+
                     // Password field
                     AnimatedTextField(
                       controller: _passwordController,
@@ -322,7 +374,9 @@ class _LoginScreenState extends State<LoginScreen>
                       },
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _showPassword ? Icons.visibility_off : Icons.visibility,
+                          _showPassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                           color: Colors.grey[600],
                         ),
                         onPressed: () {
@@ -332,9 +386,9 @@ class _LoginScreenState extends State<LoginScreen>
                         },
                       ),
                     ),
-                    
+
                     SizedBox(height: 20.h),
-                    
+
                     // Remember me & Forgot password
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -348,7 +402,8 @@ class _LoginScreenState extends State<LoginScreen>
                                   child: Checkbox(
                                     value: authProvider.rememberMe,
                                     onChanged: (value) {
-                                      authProvider.setRememberMe(value ?? false);
+                                      authProvider
+                                          .setRememberMe(value ?? false);
                                     },
                                     activeColor: Theme.of(context).primaryColor,
                                     shape: RoundedRectangleBorder(
@@ -382,9 +437,9 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                       ],
                     ),
-                    
+
                     SizedBox(height: 30.h),
-                    
+
                     // Sign In button
                     Consumer<AuthProvider>(
                       builder: (context, authProvider, _) {
@@ -429,9 +484,9 @@ class _LoginScreenState extends State<LoginScreen>
                         );
                       },
                     ),
-                    
+
                     SizedBox(height: 40.h),
-                    
+
                     // OR divider
                     Row(
                       children: [
@@ -460,9 +515,9 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                       ],
                     ),
-                    
+
                     SizedBox(height: 30.h),
-                    
+
                     // Social login buttons
                     Column(
                       children: [
@@ -496,7 +551,7 @@ class _LoginScreenState extends State<LoginScreen>
                             color: const Color(0xFF1877F2),
                           ),
                         ),
-                        if (Theme.of(context).platform == TargetPlatform.iOS) ...[
+                        if (Platform.isIOS) ...[
                           SizedBox(height: 12.h),
                           AnimatedAuthButton(
                             text: 'Continue with Apple',
@@ -511,9 +566,9 @@ class _LoginScreenState extends State<LoginScreen>
                         ],
                       ],
                     ),
-                    
+
                     SizedBox(height: 40.h),
-                    
+
                     // Sign up link
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -540,7 +595,11 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                       ],
                     ),
-                    
+
+                    SizedBox(height: 30.h),
+
+                    // Removed duplicate social login section - already have social buttons above
+
                     SizedBox(height: 40.h),
                   ],
                 ),
@@ -551,4 +610,6 @@ class _LoginScreenState extends State<LoginScreen>
       ),
     );
   }
+
+  // Removed duplicate social login methods - using _handleSocialLogin instead
 }

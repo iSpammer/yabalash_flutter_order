@@ -150,35 +150,19 @@ class ProfileScreen extends StatelessWidget {
         child: Column(
           children: [
             ProfileMenuItem(
+              icon: Icons.edit,
+              title: 'Update Profile',
+              onTap: () {
+                // Navigate to update profile
+                context.push('/update-profile');
+              },
+            ),
+            ProfileMenuItem(
               icon: Icons.history,
               title: 'Order History',
               onTap: () {
                 // Navigate to order history
                 context.push('/orders');
-              },
-            ),
-            ProfileMenuItem(
-              icon: Icons.favorite_outline,
-              title: 'Favorites',
-              onTap: () {
-                // Navigate to favorites
-                context.push('/favorites');
-              },
-            ),
-            ProfileMenuItem(
-              icon: Icons.payment,
-              title: 'Payment Methods',
-              onTap: () {
-                // Navigate to payment methods
-                context.push('/payment-methods');
-              },
-            ),
-            ProfileMenuItem(
-              icon: Icons.notifications_outlined,
-              title: 'Notifications',
-              onTap: () {
-                // Navigate to notification settings
-                context.push('/notification-settings');
               },
             ),
             ProfileMenuItem(
@@ -205,7 +189,7 @@ class ProfileScreen extends StatelessWidget {
                 _showLogoutDialog(context, authProvider);
               },
             ),
-            SizedBox(height: 20.h),
+            SizedBox(height: 100.h), // Extra padding for transparent navigation bar
           ],
         ),
       ),

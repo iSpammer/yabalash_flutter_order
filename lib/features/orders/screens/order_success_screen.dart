@@ -19,7 +19,7 @@ class OrderSuccessScreen extends StatelessWidget {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
-          context.go('/dashboard');
+          context.go('/home');
         }
       },
       child: Scaffold(
@@ -259,7 +259,7 @@ class OrderSuccessScreen extends StatelessWidget {
                       // Back to Home Button
                       TextButton(
                         onPressed: () {
-                          context.go('/dashboard');
+                          context.go('/home');
                         },
                         child: Text(
                           'Continue Shopping',

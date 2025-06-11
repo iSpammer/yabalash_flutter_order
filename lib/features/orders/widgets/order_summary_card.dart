@@ -47,7 +47,7 @@ class OrderSummaryCard extends StatelessWidget {
             ],
           ),
           SizedBox(height: 16.h),
-          
+
           // Order Number
           _buildInfoRow(
             'Order ID',
@@ -55,7 +55,7 @@ class OrderSummaryCard extends StatelessWidget {
             Icons.tag,
             Colors.orange,
           ),
-          
+
           // Order Date
           _buildInfoRow(
             'Order Date',
@@ -63,7 +63,7 @@ class OrderSummaryCard extends StatelessWidget {
             Icons.calendar_today,
             Colors.blue,
           ),
-          
+
           // Payment Method
           _buildInfoRow(
             'Payment',
@@ -71,7 +71,7 @@ class OrderSummaryCard extends StatelessWidget {
             Icons.payment,
             Colors.green,
           ),
-          
+
           // Order Type
           _buildInfoRow(
             'Order Type',
@@ -79,7 +79,7 @@ class OrderSummaryCard extends StatelessWidget {
             _getOrderTypeIcon(order.luxuryOptionName),
             Colors.purple,
           ),
-          
+
           // Schedule Info
           if (order.scheduledDateTime != null)
             _buildInfoRow(
@@ -154,7 +154,7 @@ class OrderSummaryCard extends StatelessWidget {
       final date = DateTime.parse(dateString);
       final now = DateTime.now();
       final difference = date.difference(now);
-      
+
       if (difference.inDays > 0) {
         return 'In ${difference.inDays} days';
       } else if (difference.inHours > 0) {
@@ -183,7 +183,7 @@ class OrderSummaryCard extends StatelessWidget {
     }
     return 'N/A';
   }
-  
+
   String _getPaymentMethodFromId(int id) {
     switch (id) {
       case 1:
@@ -210,7 +210,7 @@ class OrderSummaryCard extends StatelessWidget {
         return paymentOption.title;
     }
   }
-  
+
   IconData _getOrderTypeIcon(String? orderType) {
     final type = orderType?.toLowerCase() ?? 'delivery';
     if (type == 'pickup' || type == 'takeaway') {

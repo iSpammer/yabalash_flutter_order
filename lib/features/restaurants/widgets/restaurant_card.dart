@@ -43,13 +43,58 @@ class RestaurantCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildRestaurantImage(width: 80.w, height: 80.w),
+          Stack(
+            children: [
+              _buildRestaurantImage(width: 80.w, height: 80.w),
+              if (restaurant.isVendorClosed == true)
+                Positioned(
+                  top: 4.h,
+                  right: 4.w,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(4.r),
+                    ),
+                    child: Text(
+                      'CLOSED',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 8.sp,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
           SizedBox(width: 12.w),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildRestaurantName(),
+                Row(
+                  children: [
+                    Expanded(child: _buildRestaurantName()),
+                    if (restaurant.isVendorClosed == true)
+                      Container(
+                        margin: EdgeInsets.only(left: 8.w),
+                        padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4.r),
+                        ),
+                        child: Text(
+                          'Closed',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 10.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 SizedBox(height: 4.h),
                 _buildRestaurantInfo(),
                 SizedBox(height: 8.h),
@@ -175,67 +220,80 @@ class RestaurantCard extends StatelessWidget {
   }
 
   Widget _buildRestaurantMeta() {
-    return Row(
+    return Wrap(
+      spacing: 8.w,
+      runSpacing: 4.h,
       children: [
-        if (restaurant.rating != null) ...[
-          Icon(
-            Icons.star,
-            color: Colors.orange,
-            size: 14.sp,
-          ),
-          SizedBox(width: 2.w),
-          Text(
-            restaurant.rating!.toStringAsFixed(1),
-            style: TextStyle(
-              fontSize: 12.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.black87,
-            ),
-          ),
-          if (restaurant.reviewCount != null) ...[
-            Text(
-              ' (${restaurant.reviewCount})',
-              style: TextStyle(
-                fontSize: 12.sp,
-                color: Colors.grey[600],
+        if (restaurant.rating != null) 
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.star,
+                color: Colors.orange,
+                size: 14.sp,
               ),
-            ),
-          ],
-          SizedBox(width: 8.w),
-        ],
-        if (restaurant.formattedDistance != null) ...[
-          Icon(
-            Icons.location_on,
-            color: Colors.grey[600],
-            size: 14.sp,
+              SizedBox(width: 2.w),
+              Text(
+                restaurant.rating!.toStringAsFixed(1),
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+              if (restaurant.reviewCount != null)
+                Text(
+                  ' (${restaurant.reviewCount})',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: Colors.grey[600],
+                  ),
+                ),
+            ],
           ),
-          SizedBox(width: 2.w),
-          Text(
-            restaurant.formattedDistance!,
-            style: TextStyle(
-              fontSize: 12.sp,
-              color: Colors.grey[600],
-            ),
+        if (restaurant.formattedDistance != null)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.location_on,
+                color: Colors.grey[600],
+                size: 14.sp,
+              ),
+              SizedBox(width: 2.w),
+              Flexible(
+                child: Text(
+                  restaurant.formattedDistance!,
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: Colors.grey[600],
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
-          SizedBox(width: 8.w),
-        ],
-        if (restaurant.formattedDeliveryTime != null) ...[
-          Icon(
-            Icons.access_time,
-            color: Colors.grey[600],
-            size: 14.sp,
+        if (restaurant.formattedDeliveryTime != null)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.access_time,
+                color: Colors.grey[600],
+                size: 14.sp,
+              ),
+              SizedBox(width: 2.w),
+              Text(
+                restaurant.formattedDeliveryTime!,
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
           ),
-          SizedBox(width: 2.w),
-          Text(
-            restaurant.formattedDeliveryTime!,
-            style: TextStyle(
-              fontSize: 12.sp,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
-        const Spacer(),
-        if (restaurant.deliveryFee != null) ...[
+        if (restaurant.deliveryFee != null)
           Text(
             '\$${restaurant.deliveryFee!.toStringAsFixed(2)} delivery',
             style: TextStyle(
@@ -243,8 +301,9 @@ class RestaurantCard extends StatelessWidget {
               color: Colors.grey[600],
             ),
           ),
-        ],
       ],
     );
   }
+  
+
 }

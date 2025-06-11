@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/category_detail_model.dart';
 import '../services/category_service.dart';
 import '../../restaurants/models/product_model.dart';
+import '../../restaurants/models/restaurant_model.dart';
 
 class CategoryProvider extends ChangeNotifier {
   final CategoryService _categoryService = CategoryService();
@@ -17,6 +18,10 @@ class CategoryProvider extends ChangeNotifier {
   bool _isLoadingMoreProducts = false;
   String? _productsError;
   CategoryPagination? _pagination;
+  
+  // Vendors (for vendor categories)
+  List<RestaurantModel> _vendors = [];
+  bool _isVendorCategory = false;
 
   // Filters and sorting
   CategoryFilters _filters = CategoryFilters();
@@ -35,6 +40,9 @@ class CategoryProvider extends ChangeNotifier {
   // Location
   double? _latitude;
   double? _longitude;
+  
+  // Delivery type
+  String _deliveryType = 'delivery';
 
   // Getters
   CategoryDetailModel? get categoryDetail => _categoryDetail;
@@ -46,6 +54,9 @@ class CategoryProvider extends ChangeNotifier {
   bool get isLoadingMoreProducts => _isLoadingMoreProducts;
   String? get productsError => _productsError;
   CategoryPagination? get pagination => _pagination;
+  
+  List<RestaurantModel> get vendors => _vendors;
+  bool get isVendorCategory => _isVendorCategory;
 
   CategoryFilters get filters => _filters;
   CategorySortOption get selectedSort => _selectedSort;
@@ -61,7 +72,9 @@ class CategoryProvider extends ChangeNotifier {
   bool get hasNextPage => _pagination?.hasNextPage ?? false;
   bool get hasPreviousPage => _pagination?.hasPreviousPage ?? false;
   
-  int get totalProducts => _pagination?.totalItems ?? 0;
+  int get totalProducts => _isVendorCategory 
+      ? _vendors.length 
+      : (_pagination?.totalItems ?? _products.length);
   int get currentPage => _pagination?.currentPage ?? 1;
 
   // Helper getters
@@ -100,6 +113,12 @@ class CategoryProvider extends ChangeNotifier {
     _longitude = longitude;
     notifyListeners();
   }
+  
+  // Set delivery type
+  void setDeliveryType(String type) {
+    _deliveryType = type;
+    notifyListeners();
+  }
 
   // Load category details
   Future<void> loadCategoryDetails(int categoryId) async {
@@ -118,8 +137,7 @@ class CategoryProvider extends ChangeNotifier {
         _categoryDetail = response.data;
         _categoryError = null;
         
-        // For now, always try to load products
-        // TODO: Handle vendor categories differently
+        // Load products/vendors based on category type
         await loadProducts(categoryId, refresh: true);
       } else {
         _categoryError = response.message ?? 'Failed to load category details';
@@ -137,7 +155,9 @@ class CategoryProvider extends ChangeNotifier {
   Future<void> loadProducts(int categoryId, {bool refresh = false}) async {
     if (refresh) {
       _products.clear();
+      _vendors.clear();
       _pagination = null;
+      _isVendorCategory = false;
     }
 
     _isLoadingProducts = refresh;
@@ -151,32 +171,57 @@ class CategoryProvider extends ChangeNotifier {
       final response = await _categoryService.getCategoryProducts(
         categoryId: categoryId,
         page: currentPage,
-        limit: 20,
+        limit: 5, // Match React Native default
         filters: _filters,
         latitude: _latitude,
         longitude: _longitude,
+        deliveryType: _deliveryType,
       );
 
       if (response.success && response.data != null) {
         final responseData = response.data!;
-        final newProducts = responseData.products
-            .map((json) => ProductModel.fromJson(json))
-            .toList();
-
-        if (refresh) {
-          _products = newProducts;
+        
+        // Check if this is a vendor category
+        _isVendorCategory = responseData.isVendorCategory;
+        
+        debugPrint('Category response - isVendorCategory: $_isVendorCategory');
+        debugPrint('Vendors data: ${responseData.vendors?.length ?? 0}');
+        debugPrint('Products data: ${responseData.products.length}');
+        
+        if (_isVendorCategory && responseData.vendors != null) {
+          // Handle vendor category
+          debugPrint('Processing ${responseData.vendors!.length} vendors');
+          final newVendors = responseData.vendors!
+              .map((json) => RestaurantModel.fromJson(json))
+              .toList();
+          
+          if (refresh) {
+            _vendors = newVendors;
+          } else {
+            _vendors.addAll(newVendors);
+          }
+          debugPrint('Total vendors after processing: ${_vendors.length}');
         } else {
-          _products.addAll(newProducts);
+          // Handle product category
+          final newProducts = responseData.products
+              .map((json) => ProductModel.fromJson(json))
+              .toList();
+
+          if (refresh) {
+            _products = newProducts;
+          } else {
+            _products.addAll(newProducts);
+          }
         }
 
         _pagination = responseData.pagination;
         _productsError = null;
       } else {
-        _productsError = response.message ?? 'Failed to load products';
+        _productsError = response.message ?? 'Failed to load items';
       }
     } catch (e) {
       _productsError = 'An error occurred: $e';
-      debugPrint('Error loading products: $e');
+      debugPrint('Error loading category items: $e');
     } finally {
       _isLoadingProducts = false;
       _isLoadingMoreProducts = false;
@@ -302,7 +347,33 @@ class CategoryProvider extends ChangeNotifier {
 
   // Get share text for category
   String getShareText() {
-    if (_categoryDetail == null) return 'Check out this category!';
-    return _categoryDetail!.shareText;
+    if (_categoryDetail == null) return 'Check out this category on Yabalash!';
+    
+    final sb = StringBuffer();
+    sb.writeln('🛍️ ${_categoryDetail!.name}');
+    
+    if (_categoryDetail!.description != null && _categoryDetail!.description!.isNotEmpty) {
+      sb.writeln(_categoryDetail!.description!);
+    }
+    
+    if (_isVendorCategory) {
+      sb.writeln('\n🏪 ${_vendors.length} vendors available');
+    } else {
+      sb.writeln('\n📦 ${totalProducts} products available');
+    }
+    
+    // Add filters if applied
+    if (hasFiltersApplied) {
+      sb.writeln('\n🔍 Filtered by: $filtersDisplayText');
+    }
+    
+    // Add share link if available
+    if (_categoryDetail!.shareLink != null && _categoryDetail!.shareLink!.isNotEmpty) {
+      sb.writeln('\n🔗 ${_categoryDetail!.shareLink}');
+    } else {
+      sb.writeln('\n🔗 Check it out on Yabalash!');
+    }
+    
+    return sb.toString();
   }
 }

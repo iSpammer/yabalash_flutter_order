@@ -16,19 +16,28 @@ class CustomBottomNavigationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      margin: EdgeInsets.only(left: 16.w, right: 16.w, bottom: 16.h),
       decoration: BoxDecoration(
         color: Colors.white,
+        borderRadius: BorderRadius.circular(25.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Theme.of(context).primaryColor.withValues(alpha: 0.04),
+            blurRadius: 40,
+            offset: const Offset(0, 16),
+            spreadRadius: 0,
           ),
         ],
       ),
       child: SafeArea(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 12.h),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -70,32 +79,66 @@ class CustomBottomNavigationBar extends StatelessWidget {
   }) {
     final isActive = currentIndex == index;
     
-    return GestureDetector(
-      onTap: () => onTap(index),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-        decoration: BoxDecoration(
-          color: isActive ? Theme.of(context).primaryColor.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20.r),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isActive ? activeIcon : icon,
-              color: isActive ? Theme.of(context).primaryColor : Colors.grey[600],
-              size: 24.sp,
-            ),
-            SizedBox(height: 4.h),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12.sp,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive ? Theme.of(context).primaryColor : Colors.grey[600],
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onTap(index),
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+          margin: EdgeInsets.symmetric(horizontal: 4.w),
+          decoration: BoxDecoration(
+            color: isActive 
+                ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(18.r),
+            gradient: isActive 
+                ? LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Theme.of(context).primaryColor.withValues(alpha: 0.15),
+                      Theme.of(context).primaryColor.withValues(alpha: 0.05),
+                    ],
+                  )
+                : null,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: isActive ? 1.0 : 0.0),
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.elasticOut,
+                builder: (context, value, child) {
+                  return Transform.scale(
+                    scale: 1.0 + (value * 0.1),
+                    child: Icon(
+                      isActive ? activeIcon : icon,
+                      color: isActive 
+                          ? Theme.of(context).primaryColor 
+                          : Colors.grey[600],
+                      size: 24.sp,
+                    ),
+                  );
+                },
               ),
-            ),
-          ],
+              SizedBox(height: 6.h),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  fontSize: isActive ? 11.sp : 10.sp,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                  color: isActive 
+                      ? Theme.of(context).primaryColor 
+                      : Colors.grey[600],
+                  letterSpacing: isActive ? 0.5 : 0.0,
+                ),
+                child: Text(label),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -107,62 +150,118 @@ class CustomBottomNavigationBar extends StatelessWidget {
         final isActive = currentIndex == 1;
         final itemCount = cartProvider.itemCount;
         
-        return GestureDetector(
-          onTap: () => onTap(1),
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-            decoration: BoxDecoration(
-              color: isActive ? Theme.of(context).primaryColor.withOpacity(0.1) : Colors.transparent,
-              borderRadius: BorderRadius.circular(20.r),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Stack(
-                  children: [
-                    Icon(
-                      isActive ? Icons.shopping_cart : Icons.shopping_cart_outlined,
-                      color: isActive ? Theme.of(context).primaryColor : Colors.grey[600],
-                      size: 24.sp,
-                    ),
-                    if (itemCount > 0)
-                      Positioned(
-                        right: -2,
-                        top: -2,
-                        child: Container(
-                          padding: EdgeInsets.all(2.w),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(10.r),
-                            border: Border.all(color: Colors.white, width: 1),
-                          ),
-                          constraints: BoxConstraints(
-                            minWidth: 16.w,
-                            minHeight: 16.h,
-                          ),
-                          child: Text(
-                            itemCount > 99 ? '99+' : itemCount.toString(),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10.sp,
-                              fontWeight: FontWeight.w600,
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => onTap(1),
+            behavior: HitTestBehavior.opaque,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+              margin: EdgeInsets.symmetric(horizontal: 4.w),
+              decoration: BoxDecoration(
+                color: isActive 
+                    ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(18.r),
+                gradient: isActive 
+                    ? LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Theme.of(context).primaryColor.withValues(alpha: 0.15),
+                          Theme.of(context).primaryColor.withValues(alpha: 0.05),
+                        ],
+                      )
+                    : null,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: isActive ? 1.0 : 0.0),
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.elasticOut,
+                    builder: (context, value, child) {
+                      return Transform.scale(
+                        scale: 1.0 + (value * 0.1),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              isActive ? Icons.shopping_cart : Icons.shopping_cart_outlined,
+                              color: isActive 
+                                  ? Theme.of(context).primaryColor 
+                                  : Colors.grey[600],
+                              size: 24.sp,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
+                            if (itemCount > 0)
+                              Positioned(
+                                right: -6,
+                                top: -6,
+                                child: TweenAnimationBuilder<double>(
+                                  tween: Tween(begin: 0.0, end: 1.0),
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.elasticOut,
+                                  builder: (context, badgeValue, child) {
+                                    return Transform.scale(
+                                      scale: badgeValue,
+                                      child: Container(
+                                        padding: EdgeInsets.all(4.w),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [Colors.red[400]!, Colors.red[600]!],
+                                          ),
+                                          borderRadius: BorderRadius.circular(12.r),
+                                          border: Border.all(color: Colors.white, width: 2),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.red.withValues(alpha: 0.4),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        constraints: BoxConstraints(
+                                          minWidth: 18.w,
+                                          minHeight: 18.h,
+                                        ),
+                                        child: Text(
+                                          itemCount > 99 ? '99+' : itemCount.toString(),
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9.sp,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                          ],
                         ),
-                      ),
-                  ],
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  'Cart',
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                    color: isActive ? Theme.of(context).primaryColor : Colors.grey[600],
+                      );
+                    },
                   ),
-                ),
-              ],
+                  SizedBox(height: 6.h),
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
+                    style: TextStyle(
+                      fontSize: isActive ? 11.sp : 10.sp,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                      color: isActive 
+                          ? Theme.of(context).primaryColor 
+                          : Colors.grey[600],
+                      letterSpacing: isActive ? 0.5 : 0.0,
+                    ),
+                    child: const Text('Cart'),
+                  ),
+                ],
+              ),
             ),
           ),
         );

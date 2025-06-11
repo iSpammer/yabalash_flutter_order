@@ -227,7 +227,10 @@ class _OrdersScreenState extends State<OrdersScreen>
 
     return ListView.builder(
       controller: _scrollController,
-      padding: EdgeInsets.symmetric(vertical: 20.h),
+      padding: EdgeInsets.only(
+        top: 20.h,
+        bottom: 100.h, // Extra padding for transparent navigation bar
+      ),
       itemCount: orders.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == orders.length) {

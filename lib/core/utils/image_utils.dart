@@ -43,6 +43,23 @@ class ImageUtils {
     if (imageData is Map<String, dynamic>) {
       final proxyUrlFromData = imageData['proxy_url'] as String?;
       final imagePath = imageData['image_path'] as String?;
+      final imageField = imageData['image'] as String?;
+
+      // For the new format, extract the actual S3 URL from image_path
+      if (imagePath != null && imagePath.contains('/ce/0/plain/')) {
+        // Extract the actual URL from the proxy format
+        final urlMatch = RegExp(r'/ce/0/plain/(https?://[^@\s]+)').firstMatch(imagePath);
+        if (urlMatch != null && urlMatch.group(1) != null) {
+          String extractedUrl = urlMatch.group(1)!;
+          // Remove any @webp suffix
+          return extractedUrl.split('@webp').first.trim();
+        }
+      }
+
+      // If we have an image field with the path, build the full S3 URL
+      if (imageField != null && imageField.contains('category/image/')) {
+        return '$baseUrl$imageField';
+      }
 
       if (proxyUrlFromData != null && imagePath != null) {
         String proxy = proxyUrlFromData;
@@ -131,6 +148,24 @@ class ImageUtils {
 
     if (iconData is Map<String, dynamic>) {
       final imagePath = iconData['image_path'] as String?;
+      final imageField = iconData['image'] as String?;
+      
+      // For the new format, extract the actual S3 URL from image_path
+      if (imagePath != null && imagePath.contains('/ce/0/plain/')) {
+        // Extract the actual URL from the proxy format
+        final urlMatch = RegExp(r'/ce/0/plain/(https?://[^@\s]+)').firstMatch(imagePath);
+        if (urlMatch != null && urlMatch.group(1) != null) {
+          String extractedUrl = urlMatch.group(1)!;
+          // Remove any @webp suffix
+          return extractedUrl.split('@webp').first.trim();
+        }
+      }
+      
+      // If we have an image field with the path, build the full S3 URL
+      if (imageField != null && imageField.contains('category/image/')) {
+        return '$baseUrl$imageField';
+      }
+      
       if (imagePath != null) {
         return buildCategoryIconUrl(imagePath); // Recursively handle string format
       }

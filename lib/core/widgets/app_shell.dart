@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'bottom_navigation_bar.dart';
+import 'v2_bottom_navigation.dart';
 
 class AppShell extends StatefulWidget {
   final Widget child;
-  
+
   const AppShell({
     Key? key,
     required this.child,
@@ -16,7 +16,7 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _currentIndex = 0;
-  
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -25,7 +25,7 @@ class _AppShellState extends State<AppShell> {
 
   void _updateCurrentIndex() {
     final location = GoRouterState.of(context).uri.toString();
-    
+
     if (location.startsWith('/home') || location.startsWith('/dashboard')) {
       _currentIndex = 0;
     } else if (location.startsWith('/cart')) {
@@ -57,8 +57,9 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true, // Allow body to extend behind navigation
       body: widget.child,
-      bottomNavigationBar: CustomBottomNavigationBar(
+      bottomNavigationBar: V2BottomNavigation(
         currentIndex: _currentIndex,
         onTap: _onNavTap,
       ),

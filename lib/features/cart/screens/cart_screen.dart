@@ -16,6 +16,12 @@ import '../widgets/tip_selection_widget.dart';
 import '../widgets/schedule_order_widget.dart';
 import '../widgets/empty_cart_widget.dart';
 import '../widgets/cart_summary_widget.dart';
+import '../widgets/deliverable_section.dart';
+import '../widgets/animated_address_section.dart';
+import '../widgets/vendor_closed_warning.dart';
+import '../widgets/delivery_mode_indicator.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
+import '../../dashboard/widgets/delivery_pickup_toggle.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({Key? key}) : super(key: key);
@@ -32,6 +38,7 @@ class _CartScreenState extends State<CartScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
+      _syncDeliveryMode();
     });
   }
 
@@ -40,6 +47,19 @@ class _CartScreenState extends State<CartScreen> {
       _isInitialized = true;
       final cartProvider = context.read<CartProvider>();
       await cartProvider.loadCart();
+    }
+  }
+  
+  void _syncDeliveryMode() {
+    // Sync delivery mode from dashboard to cart
+    final dashboardProvider = context.read<DashboardProvider>();
+    final cartProvider = context.read<CartProvider>();
+    
+    // If dashboard has a different delivery mode, update cart and force reload
+    if (dashboardProvider.deliveryMode != cartProvider.deliveryMode) {
+      debugPrint('Cart screen: Syncing delivery mode from ${cartProvider.deliveryMode} to ${dashboardProvider.deliveryMode}');
+      // Update the mode without reloading, then reload in _loadData with correct type
+      cartProvider.setDeliveryMode(dashboardProvider.deliveryMode, skipReload: true);
     }
   }
 
@@ -144,8 +164,13 @@ class _CartScreenState extends State<CartScreen> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     child: Column(
                       children: [
-                        // Delivery address section
-                        _buildAddressSection(context),
+                        // Delivery mode indicator (read-only)
+                        DeliveryModeIndicator(
+                          currentMode: cartProvider.deliveryMode,
+                        ),
+
+                        // Animated delivery address section
+                        const AnimatedAddressSection(),
 
                         // Cart items by vendor
                         if (cartProvider.cartData != null)
@@ -156,6 +181,18 @@ class _CartScreenState extends State<CartScreen> {
                                 // Vendor header
                                 if (vendorCart.vendor != null)
                                   _buildVendorHeader(vendorCart.vendor!),
+
+                                // Delivery validation warning
+                                DeliverableSection(
+                                  vendorCart: vendorCart,
+                                  isPickupMode: cartProvider.deliveryMode == DeliveryMode.pickup,
+                                ),
+
+                                // Vendor closed warning
+                                VendorClosedWarning(
+                                  vendorCart: vendorCart,
+                                  isPickupMode: cartProvider.deliveryMode == DeliveryMode.pickup,
+                                ),
 
                                 // Cart items
                                 ...vendorCart.vendorProducts.map((item) {
@@ -233,7 +270,8 @@ class _CartScreenState extends State<CartScreen> {
                             tipAmount: cartProvider.tipAmount,
                           ),
 
-                        SizedBox(height: 100.h),
+                        // Add extra padding for transparent navigation bar
+                        SizedBox(height: 120.h),
                       ],
                     ),
                   ),
@@ -249,69 +287,6 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildAddressSection(BuildContext context) {
-    final addressProvider = context.watch<AddressProvider>();
-    final selectedAddress = addressProvider.selectedAddress;
-
-    return InkWell(
-      onTap: () {
-        context.push('/addresses/select');
-      },
-      child: Container(
-        padding: EdgeInsets.all(16.w),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(
-            bottom: BorderSide(
-              color: Colors.grey[300]!,
-              width: 1,
-            ),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.location_on_outlined,
-              size: 24.sp,
-              color: Theme.of(context).primaryColor,
-            ),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Delivery at',
-                    style: TextStyle(
-                      fontSize: 12.sp,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    selectedAddress != null
-                        ? selectedAddress.fullAddress
-                        : 'Add delivery address',
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.chevron_right,
-              size: 24.sp,
-              color: Colors.grey[600],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildVendorHeader(VendorInfo vendorInfo) {
     return Container(
@@ -348,6 +323,8 @@ class _CartScreenState extends State<CartScreen> {
                 fontSize: 16.sp,
                 fontWeight: FontWeight.w600,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -428,6 +405,37 @@ class _CartScreenState extends State<CartScreen> {
     final hasAddress = addressProvider.selectedAddress != null;
     final meetsMinimum = cartProvider.meetsMinimumOrder();
     final remainingAmount = cartProvider.getRemainingMinimumAmount();
+    final isPickupMode = cartProvider.deliveryMode == DeliveryMode.pickup;
+    
+    // Check if any vendor has delivery issues
+    bool hasDeliveryIssues = false;
+    if (!isPickupMode && cartProvider.cartData != null) {
+      for (var vendor in cartProvider.cartData!.products) {
+        if (vendor.isDeliverable == false) {
+          hasDeliveryIssues = true;
+          break;
+        }
+      }
+    }
+    
+    // Check if any vendor is closed
+    bool hasClosedVendors = false;
+    bool canScheduleOrder = false;
+    if (cartProvider.cartData != null) {
+      for (var vendor in cartProvider.cartData!.products) {
+        if (vendor.vendor?.isVendorClosed == 1 || vendor.vendor?.isVendorClosed == true) {
+          hasClosedVendors = true;
+          if (vendor.vendor?.closedStoreOrderScheduled == 1) {
+            canScheduleOrder = true;
+          }
+          break;
+        }
+      }
+    }
+    
+    // Check if schedule is required but not set
+    bool needsSchedule = hasClosedVendors && canScheduleOrder && 
+                        cartProvider.scheduleType == 'now';
     
     final currencyFormat = NumberFormat.currency(symbol: 'AED ', decimalDigits: 2);
 
@@ -461,18 +469,59 @@ class _CartScreenState extends State<CartScreen> {
             CustomButton(
               text: !isLoggedIn
                   ? 'Login to Continue'
-                  : !hasAddress
+                  : !isPickupMode && !hasAddress
                       ? 'Add Delivery Address'
+                      : hasDeliveryIssues
+                          ? 'Remove Undeliverable Items'
+                      : hasClosedVendors && !canScheduleOrder
+                          ? 'Vendor Not Available'
+                      : needsSchedule
+                          ? 'Schedule Order'
                       : cartProvider.selectedPaymentMethodId == null
                           ? 'Select Payment Method'
                           : 'Place Order',
+              backgroundColor: hasDeliveryIssues || (hasClosedVendors && !canScheduleOrder) 
+                  ? Colors.red 
+                  : needsSchedule ? Colors.orange : null,
               onPressed: cartProvider.isLoading
                   ? null
                   : () {
                       if (!isLoggedIn) {
                         context.push('/login');
-                      } else if (!hasAddress) {
+                      } else if (!isPickupMode && !hasAddress) {
                         context.push('/addresses/select');
+                      } else if (hasDeliveryIssues) {
+                        // Show error message for delivery issues
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'The specific items are not deliverable to this address. Please remove the items or change the address.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      } else if (hasClosedVendors && !canScheduleOrder) {
+                        // Show error for closed vendor that doesn't accept scheduled orders
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Vendor is not accepting orders right now.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      } else if (needsSchedule) {
+                        // Show message to schedule the order
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Please schedule your order for later as the vendor is currently closed.',
+                            ),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                        // Scroll to schedule section
+                        // You might want to implement scrolling to the schedule widget
                       } else if (!meetsMinimum) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(

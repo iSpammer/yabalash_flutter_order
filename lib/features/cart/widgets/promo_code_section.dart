@@ -60,6 +60,8 @@ class _PromoCodeSectionState extends State<PromoCodeSection> {
                       fontWeight: FontWeight.w600,
                       color: Colors.green[700],
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (widget.appliedCoupon!.amount != null)
                     Text(

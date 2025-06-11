@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../services/notification_service.dart';
 import '../widgets/app_shell.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
+import '../../features/auth/screens/forgot_password_screen.dart';
+import '../../features/auth/screens/verify_account_screen.dart';
+import '../../features/auth/screens/social_phone_screen.dart';
+import '../../features/legal/screens/terms_of_service_screen.dart';
+import '../../features/legal/screens/privacy_policy_screen.dart';
+import '../../features/auth/providers/auth_provider.dart';
 import '../../features/dashboard/screens/dashboard_screen.dart';
 import '../../features/restaurants/screens/restaurant_detail_screen.dart';
 import '../../features/cart/screens/cart_screen.dart';
@@ -11,6 +19,7 @@ import '../../features/search/screens/search_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/add_address_screen.dart';
 import '../../features/profile/screens/address_selection_screen.dart';
+import '../../features/profile/screens/update_profile_screen.dart';
 import '../../features/restaurants/screens/product_detail_screen.dart';
 import '../../features/categories/screens/category_screen.dart';
 import '../../features/payment/screens/payment_screen.dart';
@@ -24,10 +33,72 @@ import '../../features/orders/screens/webview_tracking_screen.dart';
 import '../../features/profile/models/address_model.dart';
 import '../../features/dashboard/screens/section_all_items_screen.dart';
 import '../../features/dashboard/models/dashboard_section.dart';
+import '../../features/help/screens/help_screen.dart';
+import '../../features/about/screens/about_screen.dart';
 
 class AppRouter {
-  static final GoRouter router = GoRouter(
-    initialLocation: '/login',
+  static final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  
+  static GoRouter createRouter(BuildContext context) {
+    // Set the navigator key for notifications
+    NotificationService.setNavigatorKey(_navigatorKey);
+    
+    return GoRouter(
+      navigatorKey: _navigatorKey,
+      initialLocation: '/home',
+      refreshListenable: context.read<AuthProvider>(),
+      redirect: (context, state) {
+        // Get authentication status from AuthProvider
+        final authProvider = context.read<AuthProvider>();
+        final isLoggedIn = authProvider.isLoggedIn;
+        final user = authProvider.user;
+        
+        // Check if user needs phone number completion
+        final needsPhoneNumber = user != null && 
+            (user.phoneNumberRequired == true || 
+             user.phoneNumber == null || 
+             user.phoneNumber!.isEmpty);
+      
+      final isAuthRoute = state.matchedLocation == '/login' || 
+                         state.matchedLocation == '/register' ||
+                         state.matchedLocation == '/forgot-password' ||
+                         state.matchedLocation == '/verify-account';
+                         
+      final isPhoneRoute = state.matchedLocation == '/social-phone';
+      
+      // Routes that require authentication
+      final protectedRoutes = [
+        '/cart',
+        '/profile',
+        '/orders',
+        '/payment',
+        '/addresses',
+        '/order',
+      ];
+      
+      // Check if current route is protected
+      final isProtectedRoute = protectedRoutes.any((route) => 
+        state.matchedLocation.startsWith(route));
+      
+      // Special handling for phone number requirement
+      if (isLoggedIn && needsPhoneNumber && !isPhoneRoute) {
+        // User is logged in but needs to complete phone number
+        return '/social-phone';
+      }
+      
+      // If user is not logged in and trying to access protected routes
+      if (!isLoggedIn && isProtectedRoute) {
+        return '/login';
+      }
+      
+      // If user is logged in, has phone number, and on auth routes, redirect to home
+      if (isLoggedIn && !needsPhoneNumber && isAuthRoute) {
+        return '/home';
+      }
+      
+      // Guest users can access guest-allowed routes
+      return null; // No redirect needed
+    },
     routes: [
       // Auth routes (no shell)
       GoRoute(
@@ -40,19 +111,50 @@ class AppRouter {
       ),
       GoRoute(
         path: '/verify-account',
-        builder: (context, state) => const Scaffold(
-          body: Center(
-            child: Text('Verify Account Screen - To be implemented'),
-          ),
-        ),
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return VerifyAccountScreen(
+            phoneNumber: extras?['phoneNumber'],
+            email: extras?['email'],
+            authToken: extras?['authToken'],
+          );
+        },
       ),
       GoRoute(
         path: '/forgot-password',
-        builder: (context, state) => const Scaffold(
-          body: Center(
-            child: Text('Forgot Password Screen - To be implemented'),
-          ),
-        ),
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/social-phone',
+        builder: (context, state) {
+          final authProvider = context.read<AuthProvider>();
+          final provider = authProvider.pendingSocialProvider;
+          final socialData = authProvider.pendingSocialData;
+          
+          if (provider == null || socialData == null) {
+            // Redirect to login if required data is missing
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              context.go('/login');
+            });
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          return SocialPhoneScreen(
+            provider: provider,
+            socialData: socialData,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/terms-of-service',
+        builder: (context, state) => const TermsOfServiceScreen(),
+      ),
+      GoRoute(
+        path: '/privacy-policy',
+        builder: (context, state) => const PrivacyPolicyScreen(),
       ),
 
       // Main app routes (with shell)
@@ -153,20 +255,79 @@ class AppRouter {
         path: '/addresses/select',
         builder: (context, state) => const AddressSelectionScreen(),
       ),
+      GoRoute(
+        path: '/update-profile',
+        builder: (context, state) => const UpdateProfileScreen(),
+      ),
+      GoRoute(
+        path: '/help',
+        builder: (context, state) => const HelpScreen(),
+      ),
+      GoRoute(
+        path: '/about',
+        builder: (context, state) => const AboutScreen(),
+      ),
 
       // Detail routes (no shell)
       GoRoute(
         path: '/restaurant/:id',
         builder: (context, state) {
-          final restaurantId =
-              int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
+          final idParam = state.pathParameters['id'] ?? '';
+          final restaurantId = int.tryParse(idParam);
+          
+          // Validate restaurant ID
+          if (restaurantId == null || restaurantId <= 0) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('Invalid Restaurant')),
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error, size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    const Text('Invalid restaurant ID'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => context.go('/home'),
+                      child: const Text('Go to Home'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          
           return RestaurantDetailScreen(restaurantId: restaurantId);
         },
       ),
       GoRoute(
         path: '/product/:id',
         builder: (context, state) {
-          final productId = int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
+          final idParam = state.pathParameters['id'] ?? '';
+          final productId = int.tryParse(idParam);
+          
+          // Validate product ID
+          if (productId == null || productId <= 0) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('Invalid Product')),
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error, size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    const Text('Invalid product ID'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => context.go('/home'),
+                      child: const Text('Go to Home'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          
           return ProductDetailScreen(productId: productId);
         },
       ),
@@ -176,9 +337,11 @@ class AppRouter {
           final categoryId =
               int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
           final categoryName = state.uri.queryParameters['name'];
+          final categoryImage = state.uri.queryParameters['image'];
           return CategoryScreen(
             categoryId: categoryId,
             categoryName: categoryName,
+            categoryImage: categoryImage,
           );
         },
       ),
@@ -310,4 +473,5 @@ class AppRouter {
       );
     },
   );
+  }
 }

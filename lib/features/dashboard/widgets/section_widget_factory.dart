@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../models/dashboard_section.dart';
 import '../widgets/banner_carousel.dart';
 import '../widgets/category_grid.dart';
+import '../providers/dashboard_provider.dart';
 import '../../restaurants/widgets/restaurant_card_v2.dart';
 import '../../restaurants/models/restaurant_model.dart';
 import '../../restaurants/models/product_model.dart';
@@ -135,9 +136,13 @@ class SectionWidgetFactory {
           showMoreButton: true,
           onCategoryTap: (category) {
             if (context != null) {
-              // Navigate to restaurants filtered by category
-              context.push(
-                  '/category/${category.id}?name=${Uri.encodeComponent(category.name ?? 'Category')}');
+              // Navigate to restaurants filtered by category with image
+              final params = {
+                'name': Uri.encodeComponent(category.name ?? 'Category'),
+                if (category.image != null) 'image': Uri.encodeComponent(category.image!),
+              };
+              final queryString = params.entries.map((e) => '${e.key}=${e.value}').join('&');
+              context.push('/category/${category.id}?$queryString');
             }
           },
         ),
@@ -157,26 +162,71 @@ class SectionWidgetFactory {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(height: 24.h),
-        _buildSectionHeader(section.getLocalizedTitle()),
+        _buildSectionHeaderWithToggle(section.getLocalizedTitle(), context: context),
         SizedBox(height: 12.h),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.symmetric(horizontal: 8.w),
-          itemCount: restaurants.length,
-          itemBuilder: (context, index) {
-            final restaurant = restaurants[index];
-            return RestaurantCardV2(
-              restaurant: restaurant,
-              isHorizontal: true,
-              onTap: () {
-                if (context != null) {
-                  context.push('/restaurant/${restaurant.id}');
-                }
-              },
-            );
-          },
-        ),
+        if (context != null)
+          Consumer<DashboardProvider>(
+            builder: (context, provider, _) {
+              if (provider.isCardView) {
+                // Card view
+                return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.symmetric(horizontal: 8.w),
+                  itemCount: restaurants.length,
+                  itemBuilder: (context, index) {
+                    final restaurant = restaurants[index];
+                    return RestaurantCardV2(
+                      restaurant: restaurant,
+                      isHorizontal: true,
+                      onTap: () {
+                        context.push('/restaurant/${restaurant.id}');
+                      },
+                    );
+                  },
+                );
+              } else {
+                // Grid view
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.symmetric(horizontal: 12.w),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12.w,
+                    mainAxisSpacing: 12.h,
+                    childAspectRatio: 0.85,
+                  ),
+                  itemCount: restaurants.length,
+                  itemBuilder: (context, index) {
+                    final restaurant = restaurants[index];
+                    return RestaurantCardV2(
+                      restaurant: restaurant,
+                      isHorizontal: false,
+                      onTap: () {
+                        context.push('/restaurant/${restaurant.id}');
+                      },
+                    );
+                  },
+                );
+              }
+            },
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: 8.w),
+            itemCount: restaurants.length,
+            itemBuilder: (context, index) {
+              final restaurant = restaurants[index];
+              return RestaurantCardV2(
+                restaurant: restaurant,
+                isHorizontal: true,
+                onTap: () {},
+              );
+            },
+          ),
       ],
     );
   }
@@ -1212,6 +1262,41 @@ class SectionWidgetFactory {
           fontWeight: FontWeight.w600,
           color: Colors.black87,
         ),
+      ),
+    );
+  }
+
+  static Widget _buildSectionHeaderWithToggle(String title, {BuildContext? context}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          if (context != null)
+            Consumer<DashboardProvider>(
+              builder: (context, provider, _) {
+                return IconButton(
+                  onPressed: provider.toggleViewMode,
+                  icon: Icon(
+                    provider.isCardView 
+                      ? Icons.view_list_rounded 
+                      : Icons.view_module_rounded,
+                    color: Theme.of(context).primaryColor,
+                    size: 24.sp,
+                  ),
+                  tooltip: provider.isCardView ? 'List View' : 'Card View',
+                );
+              },
+            ),
+        ],
       ),
     );
   }

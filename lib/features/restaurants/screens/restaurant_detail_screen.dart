@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../providers/restaurant_provider.dart';
 import '../widgets/restaurant_info_header.dart';
@@ -135,7 +136,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen>
       body: Consumer<RestaurantProvider>(
         builder: (context, provider, _) {
           if (provider.isLoading && provider.currentRestaurant == null) {
-            return const Center(child: CircularProgressIndicator());
+            return _buildLoadingState();
           }
 
           if (provider.errorMessage != null) {
@@ -232,12 +233,31 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen>
                             ? const CircularProgressIndicator()
                             : provider.menuCategories.isNotEmpty && _tabController == null
                                 ? const CircularProgressIndicator() // Still initializing tabs
-                                : Text(
-                                    'No menu items available',
-                                    style: TextStyle(
-                                      fontSize: 16.sp,
-                                      color: Colors.grey,
-                                    ),
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        'No menu items available',
+                                        style: TextStyle(
+                                          fontSize: 16.sp,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      if (provider.errorMessage != null) ...[
+                                        SizedBox(height: 8.h),
+                                        Padding(
+                                          padding: EdgeInsets.symmetric(horizontal: 32.w),
+                                          child: Text(
+                                            provider.errorMessage!,
+                                            style: TextStyle(
+                                              fontSize: 12.sp,
+                                              color: Colors.red,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                       ),
                     ),
@@ -266,6 +286,282 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen>
     );
   }
 
+  Widget _buildLoadingState() {
+    return CustomScrollView(
+      slivers: [
+        // App bar shimmer
+        SliverAppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          floating: false,
+          pinned: false,
+          toolbarHeight: 60.h,
+          title: Shimmer.fromColors(
+            baseColor: Colors.grey[300]!,
+            highlightColor: Colors.grey[100]!,
+            child: Container(
+              height: 20.h,
+              width: 120.w,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(4.r),
+              ),
+            ),
+          ),
+        ),
+
+        // Restaurant header shimmer
+        SliverToBoxAdapter(
+          child: Container(
+            height: 200.h,
+            child: Shimmer.fromColors(
+              baseColor: Colors.grey[300]!,
+              highlightColor: Colors.grey[100]!,
+              child: Container(
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+
+        // Restaurant info shimmer
+        SliverToBoxAdapter(
+          child: Container(
+            margin: EdgeInsets.all(16.w),
+            padding: EdgeInsets.all(16.w),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12.r),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Restaurant name
+                Shimmer.fromColors(
+                  baseColor: Colors.grey[300]!,
+                  highlightColor: Colors.grey[100]!,
+                  child: Container(
+                    height: 24.h,
+                    width: 200.w,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4.r),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                
+                // Restaurant details
+                Shimmer.fromColors(
+                  baseColor: Colors.grey[300]!,
+                  highlightColor: Colors.grey[100]!,
+                  child: Container(
+                    height: 16.h,
+                    width: 150.w,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4.r),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 12.h),
+                
+                // Rating and info row
+                Row(
+                  children: [
+                    Shimmer.fromColors(
+                      baseColor: Colors.grey[300]!,
+                      highlightColor: Colors.grey[100]!,
+                      child: Container(
+                        height: 16.h,
+                        width: 60.w,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4.r),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 16.w),
+                    Shimmer.fromColors(
+                      baseColor: Colors.grey[300]!,
+                      highlightColor: Colors.grey[100]!,
+                      child: Container(
+                        height: 16.h,
+                        width: 80.w,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4.r),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Tab bar shimmer
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _ShimmerTabBarDelegate(),
+        ),
+
+        // Menu items shimmer
+        SliverToBoxAdapter(
+          child: Container(
+            margin: EdgeInsets.symmetric(horizontal: 16.w),
+            child: Column(
+              children: List.generate(6, (index) => Container(
+                margin: EdgeInsets.only(bottom: 12.h),
+                padding: EdgeInsets.all(12.w),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Product name
+                          Shimmer.fromColors(
+                            baseColor: Colors.grey[300]!,
+                            highlightColor: Colors.grey[100]!,
+                            child: Container(
+                              height: 18.h,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(4.r),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 6.h),
+                          
+                          // Product description
+                          Shimmer.fromColors(
+                            baseColor: Colors.grey[300]!,
+                            highlightColor: Colors.grey[100]!,
+                            child: Container(
+                              height: 14.h,
+                              width: 180.w,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(4.r),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 8.h),
+                          
+                          // Price
+                          Shimmer.fromColors(
+                            baseColor: Colors.grey[300]!,
+                            highlightColor: Colors.grey[100]!,
+                            child: Container(
+                              height: 16.h,
+                              width: 60.w,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(4.r),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 12.w),
+                    
+                    // Product image
+                    Shimmer.fromColors(
+                      baseColor: Colors.grey[300]!,
+                      highlightColor: Colors.grey[100]!,
+                      child: Container(
+                        width: 80.w,
+                        height: 80.w,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+            ),
+          ),
+        ),
+
+        // Loading indicator
+        SliverToBoxAdapter(
+          child: Container(
+            padding: EdgeInsets.all(32.w),
+            child: Center(
+              child: Column(
+                children: [
+                  const CircularProgressIndicator(),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'Loading menu...',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 14.sp,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+}
+
+class _ShimmerTabBarDelegate extends SliverPersistentHeaderDelegate {
+  @override
+  double get minExtent => 48.h;
+  
+  @override
+  double get maxExtent => 48.h;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: Colors.white,
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          height: 48.h,
+          margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8.r),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(_ShimmerTabBarDelegate oldDelegate) => false;
 }
 
 class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {

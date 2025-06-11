@@ -2,9 +2,11 @@ import 'package:flutter/foundation.dart';
 
 import '../models/order_model.dart';
 import '../services/order_service.dart';
+import '../../../core/services/notification_service.dart';
 
 class OrderProvider extends ChangeNotifier {
   final OrderService _orderService = OrderService();
+  final NotificationService _notificationService = NotificationService();
 
   // Orders lists
   List<OrderModel> _activeOrders = [];
@@ -196,9 +198,13 @@ class OrderProvider extends ChangeNotifier {
       );
 
       if (response.success && response.data != null) {
+        final previousOrder = _currentOrderDetails;
         _currentOrderDetails = response.data!;
         debugPrint('Successfully loaded order details for order ID: $orderId');
         debugPrint(' order ID: ${response.data.toString()}');
+
+        // Check for status changes and send notification if needed
+        _checkForStatusChange(previousOrder, _currentOrderDetails!);
 
         // Clear any previous error
         _orderDetailsError = null;
@@ -395,6 +401,50 @@ class OrderProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  /// Check for order status changes and send notifications
+  void _checkForStatusChange(OrderModel? previousOrder, OrderModel currentOrder) {
+    // Only send notification if this is an update (not initial load)
+    if (previousOrder != null && 
+        previousOrder.id == currentOrder.id &&
+        previousOrder.status != currentOrder.status) {
+      
+      debugPrint('Order status changed from ${previousOrder.status} to ${currentOrder.status}');
+      
+      // Send notification for status change
+      _notificationService.sendOrderStatusNotification(
+        orderId: currentOrder.id,
+        status: currentOrder.status,
+        estimatedTime: currentOrder.eta,
+      );
+    }
+    
+    // Start monitoring this order if it's active
+    if (_isActiveStatus(currentOrder.status)) {
+      _notificationService.startOrderStatusMonitoring(
+        orderId: currentOrder.id,
+        currentStatus: currentOrder.status,
+      );
+    }
+  }
+  
+  /// Check if order status is considered active (should be monitored)
+  bool _isActiveStatus(String? status) {
+    if (status == null) return false;
+    
+    const activeStatuses = [
+      'confirmed',
+      'accepted', 
+      'preparing',
+      'in_preparation',
+      'ready',
+      'ready_for_pickup',
+      'picked_up',
+      'out_for_delivery'
+    ];
+    
+    return activeStatuses.contains(status.toLowerCase());
   }
 
   /// Clear all cached data

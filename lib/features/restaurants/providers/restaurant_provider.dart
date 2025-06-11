@@ -90,15 +90,9 @@ class RestaurantProvider extends ChangeNotifier {
         debugPrint('Products in response: ${_currentRestaurant!.products?.length ?? 0}');
         debugPrint('Categories in response: ${_currentRestaurant!.categories?.length ?? 0}');
         
-        // Check if vendor response includes products and categories directly
-        if (_currentRestaurant!.products != null && _currentRestaurant!.products!.isNotEmpty) {
-          debugPrint('Loading products from vendor response');
-          _loadProductsFromVendorResponse();
-        } else {
-          debugPrint('Loading menu categories separately');
-          // Fallback to loading menu categories separately
-          await _loadMenuCategories(restaurantId);
-        }
+        // Always call _loadProductsFromVendorResponse as it handles both cases
+        debugPrint('Loading products and categories from vendor response');
+        _loadProductsFromVendorResponse();
       } else {
         _errorMessage = response.message ?? 'Failed to load restaurant details';
       }
@@ -233,39 +227,83 @@ class RestaurantProvider extends ChangeNotifier {
   
   // Load products directly from vendor response
   void _loadProductsFromVendorResponse() {
-    if (_currentRestaurant?.products == null) return;
-    
     try {
-      // Group products by category
       Map<int, List<ProductModel>> productsByCategory = {};
-      Set<int> categoryIds = {};
+      List<MenuCategoryModel> categories = [];
       
-      for (var productJson in _currentRestaurant!.products!) {
-        try {
-          final product = ProductModel.fromJson(productJson);
-          final categoryId = product.categoryId;
-          
-          if (!productsByCategory.containsKey(categoryId)) {
-            productsByCategory[categoryId] = [];
+      // First, check if we have products at the root level (from vendor endpoint)
+      if (_currentRestaurant?.products != null && _currentRestaurant!.products!.isNotEmpty) {
+        debugPrint('Found ${_currentRestaurant!.products!.length} products at root level');
+        
+        // Process all products
+        for (var productJson in _currentRestaurant!.products!) {
+          try {
+            if (productJson is Map<String, dynamic>) {
+              final product = ProductModel.fromJson(productJson);
+              final categoryId = product.categoryId;
+              
+              if (!productsByCategory.containsKey(categoryId)) {
+                productsByCategory[categoryId] = [];
+              }
+              productsByCategory[categoryId]!.add(product);
+              debugPrint('Added product ${product.name} to category $categoryId');
+            }
+          } catch (e) {
+            debugPrint('Error parsing product: $e');
           }
-          productsByCategory[categoryId]!.add(product);
-          categoryIds.add(categoryId);
-        } catch (e) {
-          debugPrint('Error parsing product: $e');
         }
       }
       
-      _categoryProducts = productsByCategory;
-      
-      // Create menu categories from the products if categories aren't provided
+      // Then process categories
       if (_currentRestaurant?.categories != null && _currentRestaurant!.categories!.isNotEmpty) {
-        _menuCategories = _currentRestaurant!.categories!
-            .map((categoryJson) => MenuCategoryModel.fromJson(categoryJson))
-            .toList();
-      } else {
-        // Create categories based on products
-        _menuCategories = categoryIds.map((categoryId) {
-          final categoryProducts = productsByCategory[categoryId]!;
+        debugPrint('Processing ${_currentRestaurant!.categories!.length} categories');
+        
+        for (var categoryJson in _currentRestaurant!.categories!) {
+          try {
+            if (categoryJson is Map<String, dynamic>) {
+              final categoryModel = MenuCategoryModel.fromJson(categoryJson);
+              categories.add(categoryModel);
+              
+              // Check if category has embedded products (vendor/5 structure)
+              if (categoryJson['products'] != null && categoryJson['products'] is List) {
+                final categoryProducts = <ProductModel>[];
+                
+                for (var productJson in categoryJson['products']) {
+                  try {
+                    if (productJson is Map<String, dynamic>) {
+                      final product = ProductModel.fromJson(productJson);
+                      categoryProducts.add(product);
+                    }
+                  } catch (e) {
+                    debugPrint('Error parsing product in category: $e');
+                  }
+                }
+                
+                if (categoryProducts.isNotEmpty) {
+                  // Merge with existing products or replace
+                  if (productsByCategory.containsKey(categoryModel.id)) {
+                    productsByCategory[categoryModel.id]!.addAll(categoryProducts);
+                  } else {
+                    productsByCategory[categoryModel.id] = categoryProducts;
+                  }
+                  debugPrint('Category ${categoryModel.id} has ${categoryProducts.length} embedded products');
+                }
+              }
+            }
+          } catch (e) {
+            debugPrint('Error parsing category: $e');
+          }
+        }
+        
+        _menuCategories = categories;
+      }
+      
+      // If we have no categories but have products, create categories from products
+      if (_menuCategories.isEmpty && productsByCategory.isNotEmpty) {
+        debugPrint('No categories found, creating from ${productsByCategory.length} product groups');
+        _menuCategories = productsByCategory.entries.map((entry) {
+          final categoryId = entry.key;
+          final categoryProducts = entry.value;
           final categoryName = categoryProducts.first.categoryName ?? 'Category $categoryId';
           
           return MenuCategoryModel(
@@ -280,9 +318,20 @@ class RestaurantProvider extends ChangeNotifier {
         }).toList();
       }
       
-      debugPrint('Loaded ${_categoryProducts.length} categories with products from vendor response');
-    } catch (error) {
+      _categoryProducts = productsByCategory;
+      
+      // Log results
+      debugPrint('Final result: ${_menuCategories.length} categories');
+      int totalProducts = 0;
+      productsByCategory.forEach((key, value) {
+        totalProducts += value.length;
+        debugPrint('Category $key has ${value.length} products');
+      });
+      debugPrint('Total products loaded: $totalProducts');
+    } catch (error, stackTrace) {
       debugPrint('Error loading products from vendor response: $error');
+      debugPrint('Stack trace: $stackTrace');
+      
       // Fallback to separate API calls
       if (_currentRestaurant?.id != null) {
         _loadMenuCategories(_currentRestaurant!.id!);

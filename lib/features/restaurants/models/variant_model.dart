@@ -102,16 +102,22 @@ class VariantModel {
   factory VariantModel.fromJson(Map<String, dynamic> json) {
     return VariantModel(
       id: _parseInt(json['id']),
-      name: json['name'] ?? json['title'] ?? '',
-      sku: json['sku'],
+      name: _parseString(json['name']) ?? _parseString(json['title']) ?? '',
+      sku: _parseString(json['sku']),
       price: _parseDouble(json['price'] ?? json['new_price'] ?? json['actual_price']),
       compareAtPrice: json['compare_at_price'] != null ? _parseDouble(json['compare_at_price']) : null,
       stockQuantity: _parseInt(json['quantity_available'] ?? json['quantity'] ?? json['stock_quantity']),
-      image: json['image'],
-      barcode: json['barcode'],
+      image: _parseString(json['image']),
+      barcode: _parseString(json['barcode']),
       position: _parseInt(json['position']),
       isDefault: json['is_default'] == 1,
     );
+  }
+  
+  static String? _parseString(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return value;
+    return value.toString();
   }
 
   Map<String, dynamic> toJson() {

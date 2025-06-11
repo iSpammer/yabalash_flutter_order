@@ -11,6 +11,7 @@ import 'package:shimmer/shimmer.dart';
 
 import '../../../core/utils/image_utils.dart';
 import '../../../core/utils/html_utils.dart';
+import '../../../core/utils/auth_helper.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/cart_loading_dialog.dart';
 import '../providers/product_detail_provider.dart';
@@ -18,6 +19,8 @@ import '../models/product_model.dart';
 import '../models/review_model.dart';
 import '../models/offer_model.dart';
 import '../../cart/providers/cart_provider.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
+import '../../dashboard/widgets/delivery_pickup_toggle.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final int productId;
@@ -115,7 +118,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 color: Colors.white,
               ),
             ),
-            
+
             Padding(
               padding: EdgeInsets.all(16.w),
               child: Column(
@@ -135,7 +138,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                   ),
                   SizedBox(height: 8.h),
-                  
+
                   // Price placeholder
                   Shimmer.fromColors(
                     baseColor: Colors.grey[300]!,
@@ -150,7 +153,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                   ),
                   SizedBox(height: 16.h),
-                  
+
                   // Description placeholders
                   Shimmer.fromColors(
                     baseColor: Colors.grey[300]!,
@@ -177,9 +180,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                     ),
                   ),
-                  
+
                   SizedBox(height: 24.h),
-                  
+
                   // Loading indicator
                   Center(
                     child: Column(
@@ -572,6 +575,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
 
             SizedBox(height: 12.h),
+
+            // Time-based availability indicator
+            if (product.isLimitedTime) ...[
+              _buildTimeAvailabilityIndicator(product),
+              SizedBox(height: 12.h),
+            ],
 
             // Rating
             if (product.rating != null && product.rating! > 0)
@@ -1406,11 +1415,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             // Add to cart button
             Expanded(
               child: CustomButton(
-                text: _isAddingToCart 
+                text: _isAddingToCart
                     ? 'Adding...'
                     : 'Add to Cart - AED ${provider.totalPrice.toStringAsFixed(0)}',
                 onPressed: product.isInStock && !_isAddingToCart
-                    ? () => _addToCart(provider) 
+                    ? () => _addToCart(provider)
                     : null,
                 icon: _isAddingToCart
                     ? SizedBox(
@@ -1418,7 +1427,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         height: 20.w,
                         child: const CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : const Icon(
@@ -1757,8 +1767,21 @@ ${product.description ?? 'Delicious food waiting for you!'}$priceInfo$originalPr
   }
 
   void _addToCart(ProductDetailProvider provider) async {
+    // Check if user is logged in
+    if (!AuthHelper.checkAuthAndShowPrompt(context,
+        message: 'Please login to add items to your cart.')) {
+      return;
+    }
+
     final cartProvider = context.read<CartProvider>();
+    final dashboardProvider = context.read<DashboardProvider>();
     final product = provider.product!;
+
+    // Sync delivery mode from dashboard without reloading
+    if (dashboardProvider.deliveryMode != cartProvider.deliveryMode) {
+      cartProvider.setDeliveryMode(dashboardProvider.deliveryMode,
+          skipReload: true);
+    }
 
     // Check if product is active first
     // if (!product.isActive) {
@@ -1809,12 +1832,18 @@ ${product.description ?? 'Delicious food waiting for you!'}$priceInfo$originalPr
         }).toList();
       }
 
-      // Call addToCart with all parameters
+      // Get delivery mode from dashboard provider
+      final dashboardProvider = context.read<DashboardProvider>();
+
+      // Call addToCart with all parameters including type
       final success = await cartProvider.addToCart(
         product: product,
         quantity: provider.quantity,
         variantId: variantId,
         addons: addons,
+        type: dashboardProvider.deliveryMode == DeliveryMode.delivery
+            ? 'delivery'
+            : 'takeaway',
       );
 
       // Hide loading indicator and dialog
@@ -1830,7 +1859,7 @@ ${product.description ?? 'Delicious food waiting for you!'}$priceInfo$originalPr
       if (success) {
         // Force close any remaining dialogs before showing snackbar
         CartLoadingDialog.hideForce(context);
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${product.name} added to cart'),
@@ -1847,15 +1876,20 @@ ${product.description ?? 'Delicious food waiting for you!'}$priceInfo$originalPr
         // Check if this is a vendor conflict error from the API
         if (cartProvider.errorMessage != null &&
             (cartProvider.errorMessage!.toLowerCase().contains('vendor') ||
-             cartProvider.errorMessage!.toLowerCase().contains('another vendor') ||
-             cartProvider.errorMessage!.toLowerCase().contains('existing items'))) {
-          debugPrint('Showing vendor conflict dialog for: ${cartProvider.errorMessage}');
+                cartProvider.errorMessage!
+                    .toLowerCase()
+                    .contains('another vendor') ||
+                cartProvider.errorMessage!
+                    .toLowerCase()
+                    .contains('existing items'))) {
+          debugPrint(
+              'Showing vendor conflict dialog for: ${cartProvider.errorMessage}');
           _showVendorConflictDialog(cartProvider, product, provider.quantity);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content:
-                  Text(cartProvider.errorMessage ?? 'Failed to add item to cart'),
+              content: Text(
+                  cartProvider.errorMessage ?? 'Failed to add item to cart'),
               duration: const Duration(seconds: 2),
               backgroundColor: Colors.red,
             ),
@@ -1908,10 +1942,11 @@ ${product.description ?? 'Delicious food waiting for you!'}$priceInfo$originalPr
                 // Get the provider before any async operations
                 final provider = context.read<ProductDetailProvider>();
                 Navigator.of(dialogContext).pop();
-                
+
                 // Show loading dialog for clearing cart and adding new item
-                CartLoadingDialog.show(context, message: 'Clearing cart and adding item...');
-                
+                CartLoadingDialog.show(context,
+                    message: 'Clearing cart and adding item...');
+
                 await cartProvider.clearCart();
 
                 // Parse variant ID to int if selected
@@ -1936,11 +1971,17 @@ ${product.description ?? 'Delicious food waiting for you!'}$priceInfo$originalPr
                   }).toList();
                 }
 
+                // Get delivery mode from dashboard provider
+                final dashboardProvider = context.read<DashboardProvider>();
+
                 final success = await cartProvider.addToCart(
                   product: product,
                   quantity: quantity,
                   variantId: variantId,
                   addons: addons,
+                  type: dashboardProvider.deliveryMode == DeliveryMode.delivery
+                      ? 'delivery'
+                      : 'takeaway',
                 );
 
                 // Hide loading dialog
@@ -1953,7 +1994,7 @@ ${product.description ?? 'Delicious food waiting for you!'}$priceInfo$originalPr
                 if (success) {
                   // Force close any remaining dialogs before showing snackbar
                   CartLoadingDialog.hideForce(context);
-                  
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Cart cleared and ${product.name} added'),
@@ -1978,5 +2019,172 @@ ${product.description ?? 'Delicious food waiting for you!'}$priceInfo$originalPr
         );
       },
     );
+  }
+
+  Widget _buildTimeAvailabilityIndicator(ProductModel product) {
+    if (!product.isLimitedTime) {
+      return const SizedBox.shrink();
+    }
+
+    // Check if product is currently available
+    if (product.isCurrentlyAvailable) {
+      // Show expiry time if available
+      final timeUntilExpires = product.timeUntilExpires;
+      if (timeUntilExpires != null) {
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          decoration: BoxDecoration(
+            color: Colors.orange.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8.r),
+            border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    size: 16.sp,
+                    color: Colors.orange[700],
+                  ),
+                  SizedBox(width: 8.w),
+                  Text(
+                    'Limited Time Offer',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      color: Colors.orange[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 4.h),
+              Text(
+                'Available for ${_formatDuration(timeUntilExpires)} more',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: Colors.orange[600],
+                ),
+              ),
+            ],
+          ),
+        );
+      } else {
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          decoration: BoxDecoration(
+            color: Colors.green.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8.r),
+            border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.check_circle,
+                size: 16.sp,
+                color: Colors.green[700],
+              ),
+              SizedBox(width: 8.w),
+              Text(
+                'Limited Time Offer Available Now!',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: Colors.green[700],
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    } else {
+      // Show when it will be available
+      final timeUntilAvailable = product.timeUntilAvailable;
+      if (timeUntilAvailable != null) {
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          decoration: BoxDecoration(
+            color: Colors.blue.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8.r),
+            border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.access_time,
+                    size: 16.sp,
+                    color: Colors.blue[700],
+                  ),
+                  SizedBox(width: 8.w),
+                  Text(
+                    'Coming Soon',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      color: Colors.blue[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 4.h),
+              Text(
+                'Available in ${_formatDuration(timeUntilAvailable)}',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: Colors.blue[600],
+                ),
+              ),
+            ],
+          ),
+        );
+      } else {
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          decoration: BoxDecoration(
+            color: Colors.red.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8.r),
+            border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.cancel,
+                size: 16.sp,
+                color: Colors.red[700],
+              ),
+              SizedBox(width: 8.w),
+              Text(
+                'No Longer Available',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: Colors.red[700],
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    if (duration.inDays > 0) {
+      return '${duration.inDays}d ${duration.inHours % 24}h';
+    } else if (duration.inHours > 0) {
+      return '${duration.inHours}h ${duration.inMinutes % 60}m';
+    } else if (duration.inMinutes > 0) {
+      return '${duration.inMinutes}m';
+    } else {
+      return '${duration.inSeconds}s';
+    }
   }
 }

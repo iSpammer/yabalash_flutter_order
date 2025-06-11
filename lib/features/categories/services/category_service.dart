@@ -15,7 +15,7 @@ class CategoryService {
   }) async {
     try {
       Map<String, dynamic> queryParams = {};
-      
+
       if (latitude != null && longitude != null) {
         queryParams['latitude'] = latitude.toString();
         queryParams['longitude'] = longitude.toString();
@@ -28,11 +28,20 @@ class CategoryService {
 
       if (response.success && response.data != null) {
         try {
-          final categoryData = response.data!['data'] ?? response.data!;
+          final responseData = response.data!['data'] ?? response.data!;
+
+          // Extract category from the response structure
+          final categoryData = responseData['category'] ?? responseData;
+
+          debugPrint('Category data for parsing: $categoryData');
+          debugPrint('Category image data: ${categoryData['image']}');
+          debugPrint('Category icon data: ${categoryData['icon']}');
+
           final category = CategoryDetailModel.fromJson(categoryData);
           return ApiResponse.success(data: category);
         } catch (e) {
           debugPrint('Error parsing category details: $e');
+          debugPrint('Response data: ${response.data}');
           return ApiResponse.error(message: 'Failed to parse category details');
         }
       }
@@ -51,37 +60,45 @@ class CategoryService {
   Future<ApiResponse<CategoryProductsResponse>> getCategoryProducts({
     required int categoryId,
     int page = 1,
-    int limit = 20,
+    int limit = 5, // Match React Native default
     CategoryFilters? filters,
     double? latitude,
     double? longitude,
+    String deliveryType = 'delivery',
   }) async {
     try {
+      // Build query params exactly like React Native
       Map<String, String> queryParams = {
-        'page': page.toString(),
         'limit': limit.toString(),
+        'page': page.toString(),
+        'type': deliveryType,
       };
 
+      // Add filter parameters
+      if (filters != null) {
+        queryParams.addAll(filters.toQueryParameters());
+      }
+      
       // Add location parameters
       if (latitude != null && longitude != null) {
         queryParams['latitude'] = latitude.toString();
         queryParams['longitude'] = longitude.toString();
       }
 
-      // Add filter parameters
-      if (filters != null) {
-        queryParams.addAll(filters.toQueryParameters());
-      }
+      debugPrint('Calling category API with params: $queryParams');
 
-      // Get category products - the API returns products in the category endpoint itself
+      // Use v2 endpoint like React Native
       final response = await _apiService.get<Map<String, dynamic>>(
-        '/category/$categoryId',
+        '/v2/category/$categoryId',
         queryParameters: queryParams,
       );
 
+      debugPrint('Category $categoryId API response: ${response.data}');
+
       if (response.success && response.data != null) {
         try {
-          final productsResponse = CategoryProductsResponse.fromJson(response.data!);
+          final productsResponse =
+              CategoryProductsResponse.fromJson(response.data!);
           return ApiResponse.success(data: productsResponse);
         } catch (e) {
           debugPrint('Error parsing category products: $e');
@@ -173,11 +190,11 @@ class CategoryService {
         try {
           final data = response.data!['data'] ?? response.data!;
           final productsData = data['products'] ?? data['data'] ?? [];
-          
+
           final products = (productsData as List)
               .map((productJson) => ProductModel.fromJson(productJson))
               .toList();
-          
+
           return ApiResponse.success(data: products);
         } catch (e) {
           debugPrint('Error parsing search results: $e');
@@ -203,7 +220,7 @@ class CategoryService {
   }) async {
     try {
       Map<String, dynamic> queryParams = {};
-      
+
       if (latitude != null && longitude != null) {
         queryParams['latitude'] = latitude.toString();
         queryParams['longitude'] = longitude.toString();
@@ -236,7 +253,7 @@ class CategoryService {
   }) async {
     try {
       Map<String, dynamic> queryParams = {};
-      
+
       if (latitude != null && longitude != null) {
         queryParams['latitude'] = latitude.toString();
         queryParams['longitude'] = longitude.toString();
@@ -257,6 +274,169 @@ class CategoryService {
       );
     } catch (e) {
       debugPrint('Error loading filter options: $e');
+      return ApiResponse.error(message: 'Network error occurred');
+    }
+  }
+  
+  /// Get category products with filters (React Native style)
+  Future<ApiResponse<Map<String, dynamic>>> getCategoryWithFilters({
+    required int categoryId,
+    Map<String, dynamic>? filters,
+    int limit = 3,
+    double? latitude,
+    double? longitude,
+  }) async {
+    try {
+      Map<String, dynamic> requestData = {};
+      
+      // Add filters if provided
+      if (filters != null) {
+        requestData.addAll(filters);
+      }
+      
+      final response = await _apiService.post<Map<String, dynamic>>(
+        '/category/filters/$categoryId?limit=$limit',
+        data: requestData,
+      );
+
+      if (response.success && response.data != null) {
+        return ApiResponse.success(data: response.data!);
+      }
+
+      return ApiResponse.error(
+        message: response.message ?? 'Failed to load category with filters',
+        errors: response.errors,
+      );
+    } catch (e) {
+      debugPrint('Error loading category with filters: $e');
+      return ApiResponse.error(message: 'Network error occurred');
+    }
+  }
+  
+  /// Get optimized vendor category (v2 endpoint)
+  Future<ApiResponse<Map<String, dynamic>>> getOptimizedVendorCategory({
+    required int categoryId,
+    Map<String, dynamic>? filters,
+    int limit = 12,
+    int page = 1,
+    double? latitude,
+    double? longitude,
+  }) async {
+    try {
+      Map<String, dynamic> requestData = {};
+      
+      // Add filters if provided (brands, variants, options, range, order_type)
+      if (filters != null) {
+        requestData.addAll(filters);
+      }
+      
+      final response = await _apiService.post<Map<String, dynamic>>(
+        '/v2/vendor-optimize-category/$categoryId?limit=$limit&page=$page',
+        data: requestData,
+      );
+
+      if (response.success && response.data != null) {
+        return ApiResponse.success(data: response.data!);
+      }
+
+      return ApiResponse.error(
+        message: response.message ?? 'Failed to load optimized category',
+        errors: response.errors,
+      );
+    } catch (e) {
+      debugPrint('Error loading optimized category: $e');
+      return ApiResponse.error(message: 'Network error occurred');
+    }
+  }
+  
+  /// Get vendor category list
+  Future<ApiResponse<Map<String, dynamic>>> getVendorCategoryList({
+    required int vendorId,
+  }) async {
+    try {
+      final response = await _apiService.post<Map<String, dynamic>>(
+        '/vendor/category/list',
+        data: {
+          'vendor_id': vendorId,
+        },
+      );
+
+      if (response.success && response.data != null) {
+        return ApiResponse.success(data: response.data!);
+      }
+
+      return ApiResponse.error(
+        message: response.message ?? 'Failed to load vendor categories',
+        errors: response.errors,
+      );
+    } catch (e) {
+      debugPrint('Error loading vendor categories: $e');
+      return ApiResponse.error(message: 'Network error occurred');
+    }
+  }
+  
+  /// Get subcategory vendors
+  Future<ApiResponse<Map<String, dynamic>>> getSubcategoryVendors({
+    required int categoryId,
+    String type = 'delivery',
+    double? latitude,
+    double? longitude,
+    bool openVendor = true,
+    bool closeVendor = false,
+    bool bestVendor = false,
+  }) async {
+    try {
+      final Map<String, dynamic> requestData = {
+        'type': type,
+        'category_id': categoryId,
+        'open_vendor': openVendor ? 1 : 0,
+        'close_vendor': closeVendor ? 1 : 0,
+        'best_vendor': bestVendor ? 1 : 0,
+      };
+      
+      if (latitude != null && longitude != null) {
+        requestData['latitude'] = latitude.toString();
+        requestData['longitude'] = longitude.toString();
+      }
+      
+      final response = await _apiService.post<Map<String, dynamic>>(
+        '/get/subcategory/vendor',
+        data: requestData,
+      );
+
+      if (response.success && response.data != null) {
+        return ApiResponse.success(data: response.data!);
+      }
+
+      return ApiResponse.error(
+        message: response.message ?? 'Failed to load subcategory vendors',
+        errors: response.errors,
+      );
+    } catch (e) {
+      debugPrint('Error loading subcategory vendors: $e');
+      return ApiResponse.error(message: 'Network error occurred');
+    }
+  }
+  
+  /// Get product estimation with addons
+  Future<ApiResponse<Map<String, dynamic>>> getProductEstimationWithAddons({
+    required int categoryId,
+  }) async {
+    try {
+      final response = await _apiService.get<Map<String, dynamic>>(
+        '/estimation/get-product-estimation-with-addons?category_id=$categoryId',
+      );
+
+      if (response.success && response.data != null) {
+        return ApiResponse.success(data: response.data!);
+      }
+
+      return ApiResponse.error(
+        message: response.message ?? 'Failed to load product estimation',
+        errors: response.errors,
+      );
+    } catch (e) {
+      debugPrint('Error loading product estimation: $e');
       return ApiResponse.error(message: 'Network error occurred');
     }
   }
