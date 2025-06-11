@@ -1417,7 +1417,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: CustomButton(
                 text: _isAddingToCart
                     ? 'Adding...'
-                    : 'Add to Cart - AED ${provider.totalPrice.toStringAsFixed(0)}',
+                    : provider.totalPrice >= 100 
+                        ? 'Add - ${provider.totalPrice.toStringAsFixed(0)}'
+                        : 'Add to Cart - ${provider.totalPrice.toStringAsFixed(0)}',
                 onPressed: product.isInStock && !_isAddingToCart
                     ? () => _addToCart(provider)
                     : null,

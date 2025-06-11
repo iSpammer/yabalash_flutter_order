@@ -3,11 +3,15 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../restaurants/models/product_model.dart';
 import '../../cart/providers/cart_provider.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../../core/utils/html_utils.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
+import '../../dashboard/widgets/delivery_pickup_toggle.dart';
+import '../../../core/utils/auth_helper.dart';
 
 class EnhancedProductCard extends StatelessWidget {
   final ProductModel product;
@@ -136,7 +140,6 @@ class EnhancedProductCard extends StatelessWidget {
 
   Widget _buildVendorName() {
     // Extract vendor name from product data
-    // This could come from product.vendorId lookup or directly from API
     final vendorName = _getVendorName();
 
     if (vendorName == null || vendorName.isEmpty) {
@@ -145,15 +148,27 @@ class EnhancedProductCard extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.only(top: 4.h),
-      child: Text(
-        vendorName,
-        style: TextStyle(
-          fontSize: 14.sp,
-          color: Colors.grey[600],
-          fontWeight: FontWeight.w500,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+      child: Row(
+        children: [
+          Icon(
+            Icons.store,
+            size: 14.sp,
+            color: Colors.grey[600],
+          ),
+          SizedBox(width: 4.w),
+          Expanded(
+            child: Text(
+              vendorName,
+              style: TextStyle(
+                fontSize: 14.sp,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -329,7 +344,7 @@ class EnhancedProductCard extends StatelessWidget {
                         cartProvider.getQuantityForProduct(product);
                     if (currentQuantity > 1) {
                       // Find the cart item to update
-                      final cartItem = cartProvider.getCartItem(product.id,
+                      final cartItem = cartProvider.getCartItem(product.id ?? 0,
                           variantId: product.selectedVariantId != null
                               ? int.tryParse(product.selectedVariantId!)
                               : null);
@@ -341,7 +356,7 @@ class EnhancedProductCard extends StatelessWidget {
                       }
                     } else {
                       // Remove from cart
-                      final cartItem = cartProvider.getCartItem(product.id,
+                      final cartItem = cartProvider.getCartItem(product.id ?? 0,
                           variantId: product.selectedVariantId != null
                               ? int.tryParse(product.selectedVariantId!)
                               : null);
@@ -421,30 +436,52 @@ class EnhancedProductCard extends StatelessWidget {
                 return;
               }
 
+              // Check if user is logged in
+              if (!AuthHelper.checkAuthAndShowPrompt(context,
+                  message: 'Please login to add items to your cart.')) {
+                return;
+              }
+
               if (product.hasVariants ||
                   (product.addons?.isNotEmpty ?? false)) {
-                // For products with variants/addons, use callback or navigate to detail
-                if (onAddToCart != null) {
-                  onAddToCart!();
-                } else if (onTap != null) {
-                  onTap!();
-                }
+                // For products with variants/addons, navigate to detail page
+                context.push('/product/${product.id}');
               } else {
-                // For simple products, add directly to cart
+                // Sync delivery mode from dashboard
+                final dashboardProvider = context.read<DashboardProvider>();
+                if (dashboardProvider.deliveryMode != cartProvider.deliveryMode) {
+                  cartProvider.setDeliveryMode(dashboardProvider.deliveryMode,
+                      skipReload: true);
+                }
+
+                // For simple products, add directly to cart with explicit type
                 final success = await cartProvider.addToCart(
                   product: product,
                   quantity: 1,
+                  type: dashboardProvider.deliveryMode == DeliveryMode.delivery
+                      ? 'delivery'
+                      : 'takeaway',
                 );
 
-                if (!success && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                          cartProvider.errorMessage ?? 'Failed to add to cart'),
-                      backgroundColor: Colors.red,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
+                if (context.mounted) {
+                  if (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${product.name} added to cart'),
+                        backgroundColor: Colors.green,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            cartProvider.errorMessage ?? 'Failed to add to cart'),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
                 }
               }
             },
@@ -485,15 +522,14 @@ class EnhancedProductCard extends StatelessWidget {
 
   // Helper method to get vendor name
   String? _getVendorName() {
-    // This would typically come from the API response
-    // For now, we'll try to extract it from available data
-    // You may need to enhance this based on your API structure
-
-    // Check if vendor information is available in the product model
-    // This might come from a joined query or separate field
-
-    // Placeholder implementation - you'll need to adapt this
-    // based on your actual API response structure
-    return 'Restaurantdd Name'; // TODO: Get actual vendor name from API
+    // Get vendor name from the vendor object in product model
+    if (product.vendor != null && product.vendor!.name.isNotEmpty) {
+      return product.vendor!.name;
+    }
+    
+    // Fallback: Check if we have vendor ID and can look it up
+    // In a real app, you might want to fetch vendor details from a service
+    // For now, we'll return null if no vendor information is available
+    return null;
   }
 }

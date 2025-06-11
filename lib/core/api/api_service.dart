@@ -51,10 +51,18 @@ class ApiService {
         responseHeader: false,
         error: true,
         compact: true,
-        // filter: (options, _) {
-        //   // Skip logging if marked
-        //   return options.extra['skipLog'] != true;
-        // },
+        filter: (options, _) {
+          // Skip logging for homepage and other high-frequency endpoints
+          final path = options.path.toLowerCase();
+          if (path.contains('/homepage') || 
+              path.contains('/v2/homepage') ||
+              path.contains('/cart/list') ||
+              path.contains('/notification/count')) {
+            return false;
+          }
+          // Skip if explicitly marked
+          return options.extra['skipLog'] != true;
+        },
       ),
       InterceptorsWrapper(
         onRequest: (options, handler) async {

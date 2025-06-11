@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../providers/category_provider.dart';
 import '../models/category_detail_model.dart';
@@ -394,24 +395,12 @@ class _CategoryScreenState extends State<CategoryScreen> {
     if (provider.isLoadingProducts &&
         provider.products.isEmpty &&
         provider.vendors.isEmpty) {
-      return SliverFillRemaining(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16.h),
-              Text(
-                'Loading items...',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      // Show shimmer loading based on expected content type
+      if (provider.isVendorCategory) {
+        return _buildVendorShimmerLoading();
+      } else {
+        return _buildProductShimmerLoading();
+      }
     }
 
     if (provider.productsError != null &&
@@ -682,27 +671,154 @@ class _CategoryScreenState extends State<CategoryScreen> {
       ),
     );
   }
-}
-
-// Show filters widget in a modal
-void showFiltersModal(
-    BuildContext context, CategoryProvider provider, int categoryId) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
-    ),
-    builder: (context) => DraggableScrollableSheet(
-      initialChildSize: 0.9,
-      maxChildSize: 0.9,
-      minChildSize: 0.5,
-      expand: false,
-      builder: (context, scrollController) => CategoryFiltersWidget(
-        provider: provider,
-        categoryId: categoryId,
-        scrollController: scrollController,
+  
+  Widget _buildProductShimmerLoading() {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          return Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+            child: Shimmer.fromColors(
+              baseColor: Colors.grey[300]!,
+              highlightColor: Colors.grey[100]!,
+              child: Container(
+                height: 120.h,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      margin: EdgeInsets.all(12.w),
+                      width: 80.w,
+                      height: 80.w,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.all(12.w),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            Container(
+                              height: 18.h,
+                              width: 150.w,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(4.r),
+                              ),
+                            ),
+                            Container(
+                              height: 14.h,
+                              width: 100.w,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(4.r),
+                              ),
+                            ),
+                            Container(
+                              height: 16.h,
+                              width: 80.w,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(4.r),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Container(
+                      margin: EdgeInsets.all(12.w),
+                      width: 70.w,
+                      height: 32.h,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6.r),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+        childCount: 6,
       ),
-    ),
-  );
+    );
+  }
+
+  Widget _buildVendorShimmerLoading() {
+    return SliverPadding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.85,
+          crossAxisSpacing: 12.w,
+          mainAxisSpacing: 12.h,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            return Shimmer.fromColors(
+              baseColor: Colors.grey[300]!,
+              highlightColor: Colors.grey[100]!,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 120.h,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(12.r),
+                          topRight: Radius.circular(12.r),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(12.w),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            height: 16.h,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(4.r),
+                            ),
+                          ),
+                          SizedBox(height: 8.h),
+                          Container(
+                            height: 14.h,
+                            width: 80.w,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(4.r),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+          childCount: 6,
+        ),
+      ),
+    );
+  }
 }

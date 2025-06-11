@@ -212,6 +212,24 @@ class ProductModel {
     
     return null;
   }
+  
+  static VendorInfoModel? _parseVendorFromProduct(Map<String, dynamic> json) {
+    // Try to parse vendor from vendor field
+    final vendor = _parseVendor(json['vendor']);
+    if (vendor != null) return vendor;
+    
+    // Fallback: Create vendor from vendor_name field if available
+    if (json['vendor_name'] != null && json['vendor_name'] is String && 
+        json['vendor_name'].toString().isNotEmpty) {
+      return VendorInfoModel(
+        id: _parseInt(json['vendor_id']) ?? 0,
+        name: json['vendor_name'],
+        slug: json['vendor_slug'],
+      );
+    }
+    
+    return null;
+  }
 
   static List<AddonModel>? _parseAddons(dynamic addonsData) {
     if (addonsData == null) return null;
@@ -418,7 +436,7 @@ class ProductModel {
       variants: variantsList,
       addons: _parseAddons(json['add_on']),
       media: _parseMedia(json['media']),
-      vendor: _parseVendor(json['vendor']),
+      vendor: _parseVendorFromProduct(json),
       translations: translations,
       unit: json['unit'],
       minimumOrderCount: _parseDouble(json['minimum_order_count']) ?? 1,
